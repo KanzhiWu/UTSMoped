@@ -1,0 +1,224 @@
+/*
+ * DEPTH_VERIFICATION.hpp
+ *
+ *  Created on: Jul 30, 2013
+ *      Author: wu
+ */
+ 
+#pragma once
+#include <Eigen/Dense>
+#include <Eigen/SVD>
+
+namespace MopedNS {
+	class POSE_DEPTH_CPU_WU :public MopedAlg {
+		double param1;
+		double param2;
+		double param3;
+		double param4;
+		
+		void Vector2Matrix( vector<Pt<3> > vec, Eigen::MatrixXd &mat ) {
+			if ( mat.cols() != 3 )
+				cout << "Error in initializing the input mat!\n";
+			for ( int i = 0; i < (int)vec.size(); i ++ ) {
+				for ( int j = 0; j < 3; j ++ ) {
+					mat(i, j) = vec[i][j];
+				}
+			}
+		}
+		
+		void MatrixNormalize( Eigen::MatrixXd &mat ) {
+			double sumx = 0.0, sumy = 0.0, sumz = 0.0;
+			for ( int i = 0; i < mat.rows(); i ++ ) {
+				sumx += mat(i, 0);
+				sumy += mat(i, 1);
+				sumz += mat(i, 2);
+			}
+			double avex = sumx/mat.rows();
+			double avey = sumy/mat.rows();
+			double avez = sumz/mat.rows();
+			for ( int i = 0; i < mat.rows(); i ++ ) {
+				mat(i, 0) -= avex;
+				mat(i, 1) -= avey;
+				mat(i, 2) -= avez;
+			}
+		}
+		
+		double SumNorm( Eigen::MatrixXd mat ) {
+			double sum = 0.0;
+			for ( int i = 0; i < mat.rows(); i ++ ) {
+				sum += sqrt( mat(i, 0)*mat(i, 0) +
+				             mat(i, 1)*mat(i, 1) +
+				             mat(i, 2)*mat(i, 2) );
+			}
+			return sum;
+		}
+		
+		void AveMatrix( Eigen::MatrixXd mat, Eigen::Vector3d &ave ) {
+			double sumx = 0.0, sumy = 0.0, sumz = 0.0;
+			for ( int i = 0; i < mat.rows(); i ++ ) {
+				sumx += mat(i, 0);
+				sumy += mat(i, 1);
+				sumz += mat(i, 2);
+			}
+			ave(0, 0) = sumx/mat.rows();
+			ave(1, 0) = sumy/mat.rows();
+			ave(2, 0) = sumz/mat.rows();			
+		}
+		
+		/* mat1 is the original coordinates 
+		 * mat2 is the output coordinates */
+		bool PtsPoseSVD(	vector<Pt<3> > model, vector<Pt<3> > obser,
+							Eigen::Matrix3d &rotation,
+							Eigen::Vector3d &translation ) {
+			if ( model.size() != obser.size() )
+				return false;
+			int ptNum = model.size();
+
+			Eigen::MatrixXd matModel(ptNum, 3), matObser(ptNum, 3);
+			Vector2Matrix(model, matModel);
+			Vector2Matrix(obser, matObser);
+			cout << "Model: \n" << matModel << "\nObser: \n" << matObser << "\n";
+
+			Eigen::Vector3d aveModel, aveObser;
+			AveMatrix( matModel, aveModel );
+			AveMatrix( matObser, aveObser );
+			MatrixNormalize( matModel ); MatrixNormalize( matObser );
+			cout << "After normalization\n Model: \n" << matModel << "\nObser: \n" << matObser << "\n";
+			double sumModel = SumNorm( matModel );
+			double sumObser = SumNorm( matObser );
+			
+			if ( abs( sumModel-sumObser ) > 10.0 ) {
+				cout << "Large sum error: " << abs(sumModel-sumObser) << endl;
+				return false;
+			}
+			getchar();
+			Eigen::Matrix3d sumProduct;
+			for ( int i = 0; i < matModel.rows(); i ++ ) {
+				Eigen::MatrixXd vecModel(3, 1);
+				vecModel(0,0) = matModel(i,0);
+				vecModel(1,0) = matModel(i,1);
+				vecModel(2,0) = matModel(i,2);
+				Eigen::MatrixXd vecObser(1, 3);
+				vecObser(0,0) = matObser(i,0);
+				vecObser(0,1) = matObser(i,1);
+				vecObser(0,2) = matObser(i,2);
+				Eigen::Matrix3d product;
+				product = vecModel * vecObser;
+				sumProduct = sumProduct + product;				
+			}
+			cout << sumProduct << endl;
+			Eigen::JacobiSVD<Eigen::MatrixXd> svd(sumProduct, Eigen::ComputeThinU | Eigen::ComputeThinV);
+			Eigen::MatrixXd svdu = svd.matrixU();
+			Eigen::MatrixXd svdv = svd.matrixV();
+			rotation = svdv * (svdu.transpose());
+			
+			cout << "Pose: " << endl << rotation << endl;
+
+			translation = aveObser - rotation * aveModel;
+			cout << "Translation: " << endl << translation << endl;
+			getchar();
+			return true;			
+		}
+	
+	public:
+		POSE_DEPTH_CPU_WU( double param1, double param2, double param3, double param4 )
+		: param1(param1), param2(param2), param3(param3), param4(param4){
+		}
+
+		void getConfig( map<string, string> &config ) const {
+			GET_CONFIG( param1 );
+			GET_CONFIG( param2 );
+			GET_CONFIG( param3 );
+			GET_CONFIG( param4 );
+		}
+		
+		void setConfig( map<string, string> &config ) {
+			SET_CONFIG( param1 );
+			SET_CONFIG( param2 );
+			SET_CONFIG( param3 );
+			SET_CONFIG( param4 );
+		}
+		
+		void process( FrameData & frameData ) {
+			vector<vector<FrameData::Match> > &matches = frameData.matches;
+			DepthImage *depthImg = frameData.depthImages[0].get();
+			vector<SP_Image> &images = frameData.images;
+			
+			Image *img = frameData.images[0].get();
+			cv::Mat cvImage( img->height, img->width, CV_8UC1 );
+			for (int y = 0; y < img->height; y++) 
+				for (int x = 0; x < img->width; x++) 
+					cvImage.at<uchar>(y, x) =  (float)img->data[img->width*y+x];
+					
+			
+		
+			
+			vector<vector<Pt<3> > > modelPts;
+			vector<vector<Pt<3> > > obserPts;
+			modelPts.resize( (int)matches.size() );
+			obserPts.resize( (int)matches.size() );
+			for ( int i = 0; i < (int)matches.size(); i ++ ) {
+				if ( (int)matches[i].size() > 7 ) {
+					vector<Pt<3> > modelPtsTmp;
+					vector<Pt<3> > obserPtsTmp;
+					for ( int j = 0; j < (int)matches[i].size(); j ++ ) {
+						Pt<3> modelPt = matches[i][j].coord3D;
+						// get the depth from depth image
+						Pt<2> obserPt2d = matches[i][j].coord2D;
+						uint16_t depth = depthImg->data[obserPt2d[1]*depthImg->width + 
+														obserPt2d[0]];
+						if ( depth != 0 ) {
+							cv::Mat tmpCvImage = cvImage.clone();
+							cv::Point2f pt;
+							pt.x = obserPt2d[0];
+							pt.y = obserPt2d[1];
+							cv::circle( tmpCvImage, pt, 5, cv::Scalar::all(255), 2 );
+							modelPtsTmp.push_back( modelPt );
+							double fx = 531.80;
+							double fy = 535.17;
+							double cx = 322.57, cy = 279.63;
+							Pt<3> obserPt;
+							obserPt[0] = (obserPt2d[0] - cx)*depth/fx*0.1;
+							obserPt[1] = (obserPt2d[1] - cy)*depth/fy*0.1;
+							obserPt[2] = depth*0.1;
+							cout << obserPt << ", " << modelPt;
+							cv::imshow("image", tmpCvImage);
+							cv::waitKey(0);		
+							obserPtsTmp.push_back( obserPt );							
+						}
+					}
+//					modelPts[i] = modelPtsTmp; obserPts[i] = obserPtsTmp;
+
+					// random select features
+					int randomNumber = 0;
+					while ( randomNumber < 50 ) {
+						// select features
+						int featNumber = 0;
+						vector<int> randomIdxs;
+						int FN = 5;
+						while ( featNumber < FN ) {
+							int randomIdx = rand()%(int)(modelPtsTmp.size());
+							randomIdxs.push_back(randomIdx);
+							featNumber ++;
+						}
+						// read pose estimation points from vector
+						vector<Pt<3> > obserPosePts;
+						vector<Pt<3> > modelPosePts;
+						for ( int fidx = 0; fidx < (int)randomIdxs.size(); fidx ++ ) {
+							obserPosePts.push_back( obserPtsTmp[randomIdxs[fidx]] );
+							modelPosePts.push_back( modelPtsTmp[randomIdxs[fidx]] );
+						}
+						
+						// in-plane verification
+						
+						// SVD
+						Eigen::Matrix3d	rot;
+						Eigen::Vector3d trans;
+						bool found = PtsPoseSVD( modelPosePts, obserPosePts, rot, trans );
+						randomNumber ++;
+					}
+				}				
+			}		
+		}
+	};		
+};
