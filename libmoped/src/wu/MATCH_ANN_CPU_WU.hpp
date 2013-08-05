@@ -165,51 +165,18 @@ namespace MopedNS {
 					if( matches[nModel1].capacity() < 1000 )
 						matches[nModel1].reserve(1000);
 					matches[nModel1].resize( matches[nModel1].size() +1 );
-//					int objIdx;
 					int objFeatIdx;
-/*
-					for ( k = 0; k < (int)stepIdx.size()-1; k ++ ) {
-						if ( nx[0] < stepIdx[k+1] && nx[0] > stepIdx[k]) {
-							objIdx = k;
-							objFeatIdx = nx[0] - stepIdx[k];
-						}
-						if ( nx[0] > stepIdx.back() ) {
-							objIdx = stepIdx.size() - 1;
-							objFeatIdx = nx[0] - stepIdx.back();
-						}
-					}
-*/	
+	
 					objFeatIdx = nx[0] - stepIdx[nModel1];
 
 					FrameData::Match &match = matches[nModel1].back();
 					match.imageIdx = corresp[i].imageIdx;
 					match.coord3D = *correspFeat[nx[0]];
 					match.coord2D = corresp[i].coord2D;
+					match.cloud3D = corresp[i].cloud3D;
 					match.featIdx = objFeatIdx;
 				}
-			}
-/*		
-			for( int i = 0; i < (int)frameData.images.size(); i ++) {
-				Image *img = frameData.images[i].get();
-				cv::Mat cvImage( img->height, img->width, CV_8UC1 );
-				for (int y = 0; y < img->height; y++) {
-					for (int x = 0; x < img->width; x++) {
-						cvImage.at<uchar>(y, x) =  (float)img->data[img->width*y+x];
-					}
-				}
-
-				for ( int j = 0; j < (int)matches.size(); j ++ ) {
-					cv::Mat tmpCvImage = cvImage.clone();
-					for ( int k = 0; k < (int)matches[j].size(); k ++ ) {
-						cv::Point2f pt;
-						pt.x = matches[j][k].coord2D[0];
-						pt.y = matches[j][k].coord2D[1];
-						cv::circle( tmpCvImage, pt, 5, cv::Scalar::all(255), 2 );
-					}
-					cv::imshow("image", tmpCvImage);
-					cv::waitKey(0);		
-				}	
-			}*/		
+			}	
 		}
 	};
 };

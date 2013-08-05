@@ -9,7 +9,7 @@
 
 namespace MopedNS {
 	bool g_start = false;
-	bool * clusterObvFlag = new bool[10];
+	bool *clusterObvFlag = new bool[10];
 
 	class CLUSTER_MEAN_SHIFT_CPU_WU :public MopedAlg {
 
@@ -127,20 +127,13 @@ namespace MopedNS {
 		}
 
 		void process( FrameData &frameData ) {
-			cout << "CLUSTER_MEAN_SHIFT_CPU\n";
 			frameData.clusters.resize( models->size() );
 			pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = frameData.cloudPclPtr;
 			#pragma omp parallel for
 			for( int model = 0; model < (int)frameData.matches.size(); model ++) {
-				vector< vector< pair<Pt<3>, int> > > pointsPerImage( frameData.images.size() ) ;
+				vector< vector< pair<Pt<2>, int> > > pointsPerImage( frameData.images.size() ) ;
 				for( int match = 0; match < (int)frameData.matches[model].size(); match ++) {
-					Pt<2> tmpPt = matches[model][match].coord2D;
-					int i = tmpPt[1], j = tmpPt[0];
-					if(	cloud->points[i*cloud->width+j].x != NULL &&
-						cloud->points[i*cloud->width+j].y != NULL &&
-						cloud->points[i*cloud->width+j].z != NULL ) {
-						pointsPerImage[frameData.matches[model][match].imageIdx].push_back( make_pair( frameData.matches[model][match].coord2D, match ) );					
-					}
+					pointsPerImage[frameData.matches[model][match].imageIdx].push_back( make_pair( frameData.matches[model][match].coord2D, match ) );
 				}
 				for( int i=0; i<(int)frameData.images.size(); i++ ) {
 					MeanShift( frameData.clusters[model], pointsPerImage[i], Radius, Merge, MinPts, MaxIterations );
@@ -148,23 +141,6 @@ namespace MopedNS {
 			}
 			if( _stepName == "CLUSTER" ) 
 				frameData.oldClusters = frameData.clusters;
-
-
-
-/*			int clustersNum = (int)frameData.clusters.size();
-			if ( g_start == false ) {
-				for ( int obvIdx = 0; obvIdx < clustersNum; obvIdx ++ ) {
-					clusterObvFlag[obvIdx] = false;
-				}
-				g_start = true;
-			}
-			string DescriptorType = "SIFT";
-			for ( int clusterIdx = 0; clusterIdx < (int)frameData.clusters.size(); clusterIdx ++  ) {
-				if ( (int)frameData.clusters[clusterIdx].size() != 0  )
-					clusterObvFlag[clusterIdx] = true;
-
-			}*/
-
 		}
 	};
 };

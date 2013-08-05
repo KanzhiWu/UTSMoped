@@ -16,6 +16,19 @@ namespace MopedNS {
 	class FEAT_SIFT_CPU_WU:public MopedAlg {
 
 		string ScaleOrigin;
+		
+		bool CloudDepthExist( pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int row, int col ) {
+			double x = cloud->points[row*cloud->width+col].x*100;
+			double y = cloud->points[row*cloud->width+col].y*100;
+			double z = cloud->points[row*cloud->width+col].z*100;
+			if ( x > 0.0 && x < 200.0 &&
+			     y > 0.0 && y < 200.0 &&
+			     z > 40.0 && z < 300.0 ) {
+				return true;
+			}
+			else
+				return false;
+		}
 
 	public:
 
@@ -39,6 +52,8 @@ namespace MopedNS {
 
 		void process( FrameData &frameData ) {
 			vector<vector<bool> > cloudMask = frameData.cloudMask;
+			pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = frameData.cloudPclPtr;
+			
 //			cout << "FEAT_SIFT_CPU\n";
 			for( int i=0; i<(int)frameData.images.size(); i++) {
 				Image *img = frameData.images[i].get();
@@ -56,24 +71,29 @@ namespace MopedNS {
 				Keypoint keypts = GetKeypoints(image);
 				Keypoint key = keypts;
 				while (key) {
-					int m = key->row; int n = key->row;
-					if ( cloudMask[m][n] == true ) {
-						detectedFeatures.resize(detectedFeatures.size()+1);
-						detectedFeatures.back().imageIdx = i;
-						detectedFeatures.back().descriptor.resize(128);
-						for (int x=0; x<128; x++) {
-							detectedFeatures.back().descriptor[x] = key->descrip[x];
+					int m = key->row, n = key->col;
+					//bool CloudFlag = CloudDepthExist( cloud, m, n );
+					if ( cloudMask[m][n] == true /*&& CloudFlag == true*/ ) {
+						bool CloudFlag = CloudDepthExist( cloud, m, n );
+						if ( CloudFlag == true ) { 
+							detectedFeatures.resize(detectedFeatures.size()+1);
+							detectedFeatures.back().imageIdx = i;
+							detectedFeatures.back().descriptor.resize(128);
+							for (int x=0; x<128; x++) {
+								detectedFeatures.back().descriptor[x] = key->descrip[x];
+							}
+							detectedFeatures.back().coord2D[0] = key->col;
+							detectedFeatures.back().coord2D[1] = key->row;
+							detectedFeatures.back().cloud3D[0] = cloud->points[m*cloud->width+n].x*100;
+							detectedFeatures.back().cloud3D[1] = cloud->points[m*cloud->width+n].y*100;
+							detectedFeatures.back().cloud3D[2] = cloud->points[m*cloud->width+n].z*100;
 						}
-						detectedFeatures.back().coord2D[0] =  key->col;
-						detectedFeatures.back().coord2D[1] =  key->row;
-						cv::circle( cvImage, cv::Point(key->col, key->row), 5, cv::Scalar::all(0), 2 );
 					}
 					key = key->next;
 				}	
 				FreeKeypoints(keypts);
 				DestroyAllImages();   // we can't destroy just one!
 			}
-			cout << "SIFT feature extracting ...\n";
 		}
 	};
 };

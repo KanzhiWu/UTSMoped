@@ -14,8 +14,7 @@ namespace MopedNS {
 
 	class POSE_DEPTH_CPU_WU :public MopedAlg {
 
-		int MaxRANSACTests; 		// e.g. 500
-		int MaxLMTests;     		// e.g. 500
+		int MaxRANSACTests; 		// e.g. 100
 		int MaxObjectsPerCluster; 	// e.g. 4
 		int NPtsAlign; 			// e.g. 5
 		int MinNPtsObject; 		// e.g. 8
@@ -23,7 +22,6 @@ namespace MopedNS {
 
 		struct Match3DData {
 			Image *image;
-			DepthImage *depthImage;		
 			Pt<3> model3d;
 			Pt<3> obser3d;
 		};
@@ -48,11 +46,14 @@ namespace MopedNS {
 		}
 
 		void testAllPoints( vector<Match3DData *> &consistentCorresp, const Pose &pose, const vector<Match3DData *> &testPoints, const Float ErrorThreshold ) {
+			cout << "test all points ...\n";
 			consistentCorresp.clear();
 			foreach( corresp, testPoints ) {
 				Pt<3> p = project3d( pose, corresp->model3d, *corresp->image );
+				cout << " " << corresp->obser3d << " " << p;
 				p -= corresp->obser3d;
 				Float projectionError = p[0]*p[0]+p[1]*p[1]+p[2]*p[2];
+				cout << " " << projectionError << endl;
 				if( projectionError < ErrorThreshold )
 					consistentCorresp.push_back(corresp);
 			}
@@ -106,7 +107,7 @@ namespace MopedNS {
 					proDist += dist;
 				}
 			}
-			double DistThreshold = 0.0;
+			double DistThreshold = 5.0;
 			if ( proDist > DistThreshold )
 				return true;
 			else
@@ -121,7 +122,7 @@ namespace MopedNS {
 				matModel(i, 2) = samples[i]->model3d[2];
 				matObser(i, 0) = samples[i]->obser3d[0];
 				matObser(i, 1) = samples[i]->obser3d[1];
-				matObser(i, 1) = samples[i]->obser3d[2];
+				matObser(i, 2) = samples[i]->obser3d[2];
 			}
 		}
 		
@@ -164,7 +165,7 @@ namespace MopedNS {
 			return sum;
 		}		
 		
-		bool PoseDepth( vector<Match3DData *> samples, bool flag, Pose &pose ) {
+		void PoseDepth( vector<Match3DData *> samples, bool flag, Pose &pose ) {
 			int ptNum = samples.size();
 			Eigen::MatrixXd matModel(ptNum, 3), matObser(ptNum, 3);	
 			Match2Matrix( samples, matModel, matObser );
@@ -174,11 +175,7 @@ namespace MopedNS {
 			MatrixNormalize( matModel ); MatrixNormalize( matObser );
 			double sumModel = SumNorm( matModel );
 			double sumObser = SumNorm( matObser );		
-//			if ( abs( sumModel-sumObser ) > 10.0 ) {
-//				cout << "Large sum error: " << abs(sumModel-sumObser) << endl;
-//				return false;
-//			}
-			
+
 			Eigen::Matrix3d sumProduct;
 			Eigen::Matrix3d rotation;
 			Eigen::Vector3d translation;
@@ -200,7 +197,7 @@ namespace MopedNS {
 				svdv = svd.matrixV();
 								
 			}
-			if ( flag == true ) {
+			if ( flag == false ) {
 				rotation = svdv * (svdu.transpose());
 			}
 			else {
@@ -210,8 +207,6 @@ namespace MopedNS {
 				rotation = svdv * (svdu.transpose());
 			}
 			translation = aveObser - rotation * aveModel;
-			cout << "Rotation: \n" << rotation << endl;
-			cout << "Translation: " << endl << translation << endl;
 			Pt<4> rot;
 			double tr = rotation(0,0) + rotation(1,1) + rotation(2,2);
 			if ( tr > 0 ) {
@@ -239,43 +234,49 @@ namespace MopedNS {
 			else {
 				double S = sqrt(1.0+rotation(2,2)-rotation(0,0)-rotation(1,1))*2;
 				rot[0] = (rotation(0,2)+rotation(2,0))/S;
-				rot[2] = (rotation(1,2)+rotation(2,1))/S;
-				rot[3] = 0.25*S;
-				rot[4] = (rotation(1,0)-rotation(0,1))/S;
+				rot[1] = (rotation(1,2)+rotation(2,1))/S;
+				rot[2] = 0.25*S;
+				rot[3] = (rotation(1,0)-rotation(0,1))/S;
 			}
+			
 			Pt<3> trans;
 			trans[0] = translation(0,0);
-			trans[1] = translation(0,1);
-			trans[2] = translation(0,2);
+			trans[1] = translation(1,0);
+			trans[2] = translation(2,0);
 			pose.translation = trans;
 			pose.rotation[0] = rot[0];
 			pose.rotation[1] = rot[1];
 			pose.rotation[2] = rot[2];
 			pose.rotation[3] = rot[3]; 
-			return true;
+			
+			cout << pose.rotation << " " << pose.translation; getchar();
+			/*
+			double phi, theta, psi;
+			phi 	= 2*( pose.rotation[3]*pose.rotation[0] + pose.rotation[1]*pose.rotation[2] )
+					  /( 1-2*(pow(pose.rotation[0], 2)+pow(pose.rotation[1], 2)) );
+			theta 	= 2*( pose.rotation[3]*pose.rotation[1]-pose.rotation[2]*pose.rotation[0] );
+			psi 	= 2*( pose.rotation[3]*pose.rotation[2] + pose.rotation[0]*pose.rotation[1] )
+					  /( 1-2*(pow(pose.rotation[1], 2)+pow(pose.rotation[2], 2)) );		
+			phi = atan( phi ) * 180/PI;
+			theta = asin( theta ) * 180/PI;
+			psi = atan( psi ) * 180/PI;
+			cout << "Pose Eular angle: " << phi << ", " << theta << ", " << psi << endl;	
+			*/
 		}
 		
 		bool RANSAC( Pose &pose, const vector<Match3DData *> &cluster ) {
-			getchar();
 			vector<Match3DData *> samples;
 			for ( int nIters = 0; nIters < MaxRANSACTests; nIters ++) {
 				samples.clear();
 				if( !randSample( samples, cluster, NPtsAlign ) ) 
 					return false;
-				
-//				for ( int i = 0; i < (int)samples.size(); i ++ )
-//					cout << samples[i]->model3d << " " << samples[i]->obser3d << endl;
-//				getchar();
 				initPose( pose, samples );
-				// planar/non-planar decision
-				bool PlanarFlag = PlanarSamples( samples );
-				
+//				bool PlanarFlag = PlanarSamples( samples );
+				bool PlanarFlag = true;
 				PoseDepth( samples, PlanarFlag, pose );
-//				int LMIterations = optimizeCamera( pose, samples, MaxLMTests );
-//				if( LMIterations == -1 ) 
-//					continue;
 				vector<Match3DData *> consistent;
 				testAllPoints( consistent, pose, cluster, ErrorThreshold );
+				cout << "consistent size: " << (int)consistent.size() << endl;
 				if ( (int)consistent.size() > MinNPtsObject ) {
 //					optimizeCamera( pose, consistent, MaxLMTests );
 					return true;
@@ -286,77 +287,26 @@ namespace MopedNS {
 
 		void preprocessAllMatches( 	vector<vector< Match3DData > > &optData,
 									const vector< vector< FrameData::Match > > &matches,
-									const vector< SP_Image > &images,
-									const vector< SP_DepthImage > &depthImages,
-									pcl::PointCloud<pcl::PointXYZ>::Ptr cloud ) {
-			double fx = 531.80;
-			double fy = 535.17;
-			double cx = 322.57, cy = 279.63;
+									const vector< SP_Image > &images ) {
 			optData.resize( matches.size() );
+			for ( int model = 0; model < (int)matches.size(); model ++ )
+				optData[model].resize( matches[model].size() );
 			vector< pair<int,int> > tasks;
 			tasks.reserve(1000);
 			for(int model=0; model<(int)matches.size(); model++ )
 				for(int match=0; match<(int)matches[model].size(); match++ )
 					tasks.push_back( make_pair(model, match) );
-			
-			const SP_Image &image = images[0];
-			const SP_DepthImage &depthImage = depthImages[0];
-			
-			Image *img = image.get();
-			cv::Mat cvImage( img->height, img->width, CV_8UC1 );
-			for (int y = 0; y < img->height; y++) {
-				for (int x = 0; x < img->width; x++) {
-					cvImage.at<uchar>(y, x) =  (float)img->data[img->width*y+x];
-				}
-			}
-			cv::Mat tmpCvImage = cvImage.clone();;
-//			#pragma omp parallel for
+
+			#pragma omp parallel for
 			for(int task=0; task<(int)tasks.size(); task++) {
-//				tmpCvImage = cvImage.clone();
 				int model=tasks[task].first;
 				int match=tasks[task].second;
-				Pt<2> tmpPt = matches[model][match].coord2D;
-				int i = tmpPt[1], j = tmpPt[0];
-				uint16_t depth = depthImage.get()->data[tmpPt[1]*depthImage->width + tmpPt[0]];
-				if(	cloud->points[i*cloud->width+j].x != NULL &&
-					cloud->points[i*cloud->width+j].y != NULL &&
-					cloud->points[i*cloud->width+j].z != NULL ) {
-					
-					Match3DData tmp;
-					Pt<3> obserPt;
-//					obserPt[0] = (tmpPt[0] - cx)*depth/fx*0.1;
-//					obserPt[1] = (tmpPt[1] - cy)*depth/fy*0.1;
-//					obserPt[2] = depth*0.1;
-					
-					obserPt[0] = cloud->points[i*cloud->width+j].x*100;
-					obserPt[1] = cloud->points[i*cloud->width+j].y*100;
-					obserPt[2] = cloud->points[i*cloud->width+j].z*100;
-					tmp.model3d = matches[model][match].coord3D;
-					tmp.obser3d = obserPt;
-					tmp.image = image.get();
-					tmp.depthImage = depthImage.get();
-					optData[model].push_back( tmp );
-//					cout << obserPt << " " << matches[model][match].coord3D << ";\n";
-//					cv::Point2f pt;
-//					pt.x = matches[model][match].coord2D[0];
-//					pt.y = matches[model][match].coord2D[1];
-//					cv::circle( tmpCvImage, pt, 5, cv::Scalar::all(255), 2 );
-//					cv::imshow( "image", tmpCvImage );
-//					cv::waitKey(0);					
-				}
+				const SP_Image &image = images[matches[model][match].imageIdx];
+
+				optData[model][match].model3d = matches[model][match].coord3D;
+				optData[model][match].obser3d = matches[model][match].cloud3D;
+				optData[model][match].image = image.get();				
 			}
-//			cv::imshow( "image", tmpCvImage );
-//			cv::waitKey(0);				
-/*			
-			for ( int i = 0; i < (int)optData.size(); i ++ ) {
-				cout << optData[i].size() << " ";
-				for ( int j = 0; j < (int)optData[i].size(); j ++ ) {
-					cout << optData[i][j].model3d << " " << optData[i][j].obser3d << ";\n";
-				}
-				cout << endl;
-			}
-			*/
-//			getchar();
 		}
 
 		void outputcl(  vector<Match3DData *> cl) {
@@ -370,24 +320,22 @@ namespace MopedNS {
 
 	public:
 
-		POSE_DEPTH_CPU_WU( int MaxRANSACTests, int MaxLMTests, int MaxObjectsPerCluster, int NPtsAlign, int MinNPtsObject, Float ErrorThreshold )
-		: MaxRANSACTests(MaxRANSACTests), MaxLMTests(MaxLMTests), MaxObjectsPerCluster(MaxObjectsPerCluster), NPtsAlign(NPtsAlign),
+		POSE_DEPTH_CPU_WU( int MaxRANSACTests, int MaxObjectsPerCluster, int NPtsAlign, int MinNPtsObject, Float ErrorThreshold )
+		: MaxRANSACTests(MaxRANSACTests), MaxObjectsPerCluster(MaxObjectsPerCluster), NPtsAlign(NPtsAlign),
 		  MinNPtsObject(MinNPtsObject), ErrorThreshold(ErrorThreshold) {
 		}
 
 		void getConfig( map<string,string> &config ) const {
-
 			GET_CONFIG( MaxRANSACTests );
-			GET_CONFIG( MaxLMTests );
+			GET_CONFIG( MaxObjectsPerCluster );
 			GET_CONFIG( NPtsAlign );
 			GET_CONFIG( MinNPtsObject );
 			GET_CONFIG( ErrorThreshold );
 		}
 
 		void setConfig( map<string,string> &config ) {
-
 			SET_CONFIG( MaxRANSACTests );
-			SET_CONFIG( MaxLMTests );
+			SET_CONFIG( MaxObjectsPerCluster );
 			SET_CONFIG( NPtsAlign );
 			SET_CONFIG( MinNPtsObject );
 			SET_CONFIG( ErrorThreshold );
@@ -401,8 +349,8 @@ namespace MopedNS {
 			vector< vector< FrameData::Match > > &matches = frameData.matches;
 			vector< vector< FrameData::Cluster > > &clusters = frameData.clusters;
 			vector< vector< Match3DData > > matchData;
-			pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = frameData.cloudPclPtr;
-			preprocessAllMatches( matchData, matches, images, depthImages, cloud );
+			preprocessAllMatches( matchData, matches, images );
+			
 			vector< pair<int,int> > tasks;
 			tasks.reserve(1000);
 			int model;
@@ -411,45 +359,15 @@ namespace MopedNS {
 					for(int obj=0; obj<NObjectsCluster; obj++)
 						tasks.push_back( make_pair(model, cluster) );
 			}
-			for ( int i = 0; i < matchData.size(); i ++ ) {
-				cout << "Number: " << matchData[i].size() << endl;
-				for ( int j = 0; j < matchData[i].size(); j ++ ) {
-					cout << matchData[i][j].obser3d << " "
-					     << matchData[i][j].model3d << endl;
-				}
-				cout << endl;
-			}
-			getchar();
-			cout << clusters.size() << endl;
-			for ( int i = 0; i < clusters.size(); i ++ ) {
-				cout << clusters[i].size() << endl;
-				for ( int j = 0; j < clusters[i].size(); j ++ ) {
-					cout << clusters[i][j].size() << endl;
-					list<int>::iterator k;
-					for ( k = clusters[i][j].begin(); k != clusters[i][j].end(); ++ k )
-						cout << *k << " ";
-					cout << "******\n";
-				}
-				cout << "------\n";
-			}
-			/* Tasks.size() = NObjectsCluster * SUM(clusters[i].size())
-			 * clusters.size() = 10 which is the number of loaded models
-			 * clusters[i].size() = cluster # for each object minimum is 0
-			 * each task[i] should be index for objects and the clusters in
-			 * 		each models
-			 * LmData is just a clone of matches result
-			 */
+
 //			#pragma omp parallel for
 			for(int task = 0; task < (int)tasks.size(); task ++) {
 				int model = tasks[task].first;
 				int cluster = tasks[task].second;
 				vector<Match3DData *> cl;
-				foreach( point, clusters[model][cluster] ){
-					cout << matchData[model][point].obser3d << " "
-					     << matchData[model][point].model3d << endl;
+				foreach( point, clusters[model][cluster] )
 					cl.push_back( & matchData[model][point] );
-				}
-				getchar();
+//				getchar();
 				outputcl(cl);
 				Pose pose;
 				bool found = RANSAC( pose, cl );
@@ -461,7 +379,8 @@ namespace MopedNS {
 				 * 		It seems it didn't follow the found (true or false), the
 				 * 		default threads set which is 4, the number of push_back
 				 * 		  */
-				if ( found > 0 )
+				if ( found > 0 ) {
+					cout << "found object ...\n";
 					#pragma omp critical(POSE)
 					{
 						SP_Object obj(new Object);
@@ -469,7 +388,7 @@ namespace MopedNS {
 						obj->pose = pose;
 						obj->model = (*models)[model];
 					}
-
+				}
 			}
 			if( _stepName == "POSE" )
 				frameData.oldObjects = *frameData.objects;

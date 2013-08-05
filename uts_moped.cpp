@@ -282,7 +282,7 @@ public:
 
 			// Display some info
 
-/*			clog << " Found " << objects.size() << " objects" << endl;
+			clog << " Found " << objects.size() << " objects" << endl;
 			cv::RNG rng( 0xFFFFFFFF );
 			int observeCnt;
 			double varphi, theta, psi;
@@ -291,7 +291,7 @@ public:
 				string DescriptorType = object->model->IPs.begin()->first;
 				int icolor = (unsigned)rng;
 				clog << " Found " << object->model->name << " at " << object->pose << " with score " << object->score << endl;
-
+				/*
 				varphi 	= 2*( object->pose.rotation[3]*object->pose.rotation[0] + object->pose.rotation[1]*object->pose.rotation[2] )
 						  /( 1-2*(pow(object->pose.rotation[0], 2)+pow(object->pose.rotation[1], 2)) );
 				theta 	= 2*( object->pose.rotation[3]*object->pose.rotation[1]-object->pose.rotation[2]*object->pose.rotation[0] );
@@ -305,7 +305,6 @@ public:
 				int ptIndex;
 				MopedNS::Pt<3> pt3It;
 				MopedNS::Pt<2> pt2It;
-
 				observeCnt = 0;
 				for ( ptIndex = 0; ptIndex < featNumber; ptIndex ++ ){
 					if ( object->model->IPs[DescriptorType][ptIndex].observeFlag == true ) {
@@ -316,7 +315,9 @@ public:
 					}
 				}
 				cout << "In object " << object->model->name << ", observed features: " << observeCnt << endl;
+				*/
 			}
+			/*
 			cv::imshow( "image", wuRgbImage );
 			cv::imshow( "depthImage", wuDepthImage );
 			cv::waitKey(0);

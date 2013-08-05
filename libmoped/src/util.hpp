@@ -38,11 +38,13 @@ namespace MopedNS {
 			Pt<2> coord2D;
 			// Feature detected in the image
 			vector<float> descriptor;
+			Pt<3> cloud3D;
 		};
 		struct Match {
 			int imageIdx;
 			Pt<2> coord2D;
 			Pt<3> coord3D;
+			Pt<3> cloud3D;
 			int featIdx;
 		};
 		typedef list<int> Cluster;

@@ -37,17 +37,9 @@ disp("If RMSE is near zero, the function is correct!");
 
 % expects row data
 function [R,t] = rigid_transform_3D(A, B)
-    if nargin != 2
-	    error("Missing parameters");
-    end
-
-    assert(size(A) == size(B))
-
     centroid_A = mean(A);
     centroid_B = mean(B);
-
     N = size(A,1);
-
     H = (A - repmat(centroid_A, N, 1))' * (B - repmat(centroid_B, N, 1));
 
     [U,S,V] = svd(H);
@@ -55,10 +47,47 @@ function [R,t] = rigid_transform_3D(A, B)
     R = V*U';
 
     if det(R) < 0
-        printf("Reflection detected\n");
-        V(:,3) *= -1;
+        V(:,3) = -V(:,3);
         R = V*U';
     end
 
-    t = -R*centroid_A' + centroid_B'
+    t = -R*centroid_A' + centroid_B';
+    tr = R(1,1) + R(2,2) + R(3,3);
+    rot = zeros(1,4);
+    if tr > 0
+        S = sqrt(tr+1.0)/2;
+        rot(1,1) = (R(3,2)-R(2,3))/S;
+        rot(1,2) = (R(1,3)-R(3,1))/S;
+        rot(1,3) = (R(2,1)-R(1,2))/S;
+        rot(1,4) = 0.25*S;
+    elseif (R(1,1) > R(2,2)) & (R(1,1) > R(3,3))
+        S = sqrt(1.0+R(1,1)-R(1,1)-R(2,2))*2;
+        rot(1,1) = 0.25*S;
+        rot(1,2) = (R(1,2)+R(2,1))/S;
+        rot(1,3) = (R(1,3)+R(3,1))/S;
+        rot(1,4) = (R(3,2)-R(2,3))/S;
+    elseif R(2,2) > R(3,3)
+        S = sqrt(1.0+R(2,2)-R(1,1)-R(3,3))*2;
+        rot(1,1) = (R(1,2)+R(2,1))/S;
+        rot(1,2) = 0.25*S;
+        rot(1,3) = (R(2,3)+R(3,2))/S;
+        rot(1,4) = (R(1,3)-R(3,1))/S;
+    else
+        S = sqrt(1.0+R(3,3)-R(1,1)-R(2,2))*2;
+        rot(1,1) = (R(1,3)+R(3,1))/S;
+        rot(1,2) = (R(2,3)+R(3,2))/S;
+        rot(1,3) = 0.25*S;
+        rot(1,4) = (R(2,1)-R(1,2))/S;
+    end
+    w = rot(1,1); x = rot(1,2);
+    y = rot(1,3); z = rot(1,4);
+    phi = atan2(2*(w*x+y*z), 1-2*(x*x+y*y));
+    theta = asin(2*(w*y-z*x));
+    psi = atan2(2*(w*z+x*y), 1-2*(y*y+z*z));
+    ret = zeros(1,6);
+    ret(1,1) = phi; ret(1,2) = theta; ret(1,3) = psi;
+    ret(1,4) = t(1,1);
+    ret(1,5) = t(2,1);
+    ret(1,6) = t(3,1);
+    ret
 end
