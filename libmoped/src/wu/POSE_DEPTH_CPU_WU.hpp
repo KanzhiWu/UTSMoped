@@ -46,14 +46,14 @@ namespace MopedNS {
 		}
 
 		void testAllPoints( vector<Match3DData *> &consistentCorresp, const Pose &pose, const vector<Match3DData *> &testPoints, const Float ErrorThreshold ) {
-			cout << "test all points ...\n";
+//			cout << "test all points ...\n";
 			consistentCorresp.clear();
 			foreach( corresp, testPoints ) {
 				Pt<3> p = project3d( pose, corresp->model3d, *corresp->image );
-				cout << " " << corresp->obser3d << " " << p;
+//				cout << " " << corresp->obser3d << " " << p;
 				p -= corresp->obser3d;
 				Float projectionError = p[0]*p[0]+p[1]*p[1]+p[2]*p[2];
-				cout << " " << projectionError << endl;
+//				cout << " " << projectionError << endl;
 				if( projectionError < ErrorThreshold )
 					consistentCorresp.push_back(corresp);
 			}
@@ -249,7 +249,8 @@ namespace MopedNS {
 			pose.rotation[2] = rot[2];
 			pose.rotation[3] = rot[3]; 
 			
-			cout << pose.rotation << " " << pose.translation; getchar();
+//			cout << pose.rotation << " " << pose.translation;
+			//getchar();
 			/*
 			double phi, theta, psi;
 			phi 	= 2*( pose.rotation[3]*pose.rotation[0] + pose.rotation[1]*pose.rotation[2] )
@@ -272,13 +273,13 @@ namespace MopedNS {
 					return false;
 				initPose( pose, samples );
 //				bool PlanarFlag = PlanarSamples( samples );
-				bool PlanarFlag = true;
+				bool PlanarFlag = false;
 				PoseDepth( samples, PlanarFlag, pose );
 				vector<Match3DData *> consistent;
 				testAllPoints( consistent, pose, cluster, ErrorThreshold );
 				cout << "consistent size: " << (int)consistent.size() << endl;
 				if ( (int)consistent.size() > MinNPtsObject ) {
-//					optimizeCamera( pose, consistent, MaxLMTests );
+					PoseDepth( consistent, PlanarFlag, pose );					
 					return true;
 				}
 			}
@@ -347,6 +348,13 @@ namespace MopedNS {
 			vector< SP_Image > &images = frameData.images;
 			vector< SP_DepthImage > &depthImages = frameData.depthImages ;
 			vector< vector< FrameData::Match > > &matches = frameData.matches;
+/*
+			for ( int i = 0; i < (int)matches.size(); i ++ ) {
+				for ( int j = 0; j < (int)matches[i].size(); j ++ ) {
+					cout << matches[i][j].cloud3D << " " << matches[i][j].coord3D << " " << matches[i][j].coord2D << endl;
+				}
+			}
+			*/
 			vector< vector< FrameData::Cluster > > &clusters = frameData.clusters;
 			vector< vector< Match3DData > > matchData;
 			preprocessAllMatches( matchData, matches, images );
@@ -367,7 +375,6 @@ namespace MopedNS {
 				vector<Match3DData *> cl;
 				foreach( point, clusters[model][cluster] )
 					cl.push_back( & matchData[model][point] );
-//				getchar();
 				outputcl(cl);
 				Pose pose;
 				bool found = RANSAC( pose, cl );

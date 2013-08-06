@@ -55,7 +55,7 @@ namespace MopedNS {
 		pipeline.addAlg( "SIFT", new FEAT_SIFT_CPU_WU("-1") );
 		pipeline.addAlg( "MATCH_SIFT", new MATCH_ANN_CPU_WU( 128, "SIFT", 5., 0.8) );
 		pipeline.addAlg( "CLUSTER", new CLUSTER_MEAN_SHIFT_CPU_WU( 200, 20, 7, 100) );
-		pipeline.addAlg( "DEPTH_POSE", new POSE_DEPTH_CPU_WU( 100, 4, 6, 8, 50 ) );
+		pipeline.addAlg( "DEPTH_POSE", new POSE_DEPTH_CPU_WU( 100, 4, 4, 8, 20 ) );
 		pipeline.addAlg( "GLOBAL_DISPLAY", new GLOBAL_DISPLAY( 2 ) );
 		/*
 		pipeline.addAlg( "UNDISTORTED_IMAGE", new UTIL_UNDISTORT );		
@@ -66,9 +66,9 @@ namespace MopedNS {
 		pipeline.addAlg( "FILTER", new FILTER_PROJECTION_CPU( 5, 4096., 2) );
 		pipeline.addAlg( "POSE2", new POSE_RANSAC_LM_DIFF_REPROJECTION_CPU( 100, 500, 4, 6, 8, 5) );
 		pipeline.addAlg( "FILTER2", new FILTER_PROJECTION_CPU( 7, 4096., 5) );
-		pipeline.addAlg( "STATUS_DISPLAY", new STATUS_DISPLAY( DEFAULT_DISPLAY_LEVEL ) );
-//		pipeline.addAlg( "GLOBAL_DISPLAY", new GLOBAL_DISPLAY( 2 ) );
+		pipeline.addAlg( "GLOBAL_DISPLAY", new GLOBAL_DISPLAY( 2 ) );
 //		pipeline.addAlg( "DEPTH", new DEPTH_VERIFICATION(0., 100, 500, 4, 6, 8, 5) );
+//		pipeline.addAlg( "STATUS_DISPLAY", new STATUS_DISPLAY( DEFAULT_DISPLAY_LEVEL ) );
 		*/
 	}
 };

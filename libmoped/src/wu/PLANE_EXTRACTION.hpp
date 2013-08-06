@@ -173,7 +173,7 @@ namespace MopedNS {
 						}
 					}
 //					cv::imshow( "cloudMask", cloudMaskImg );
-//					cv::waitKey(0);				
+//					cv::waitKey(10);				
 				}				
 			}
 		}

@@ -17,12 +17,12 @@ namespace MopedNS {
 
 		string ScaleOrigin;
 		
-		bool CloudDepthExist( pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int row, int col ) {
+		bool CloudDepthExist( pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, double row, double col ) {
 			double x = cloud->points[row*cloud->width+col].x*100;
 			double y = cloud->points[row*cloud->width+col].y*100;
 			double z = cloud->points[row*cloud->width+col].z*100;
-			if ( x > 0.0 && x < 200.0 &&
-			     y > 0.0 && y < 200.0 &&
+			if ( x > -500.0 && x < 500.0 &&
+			     y > -500.0 && y < 500.0 &&
 			     z > 40.0 && z < 300.0 ) {
 				return true;
 			}
@@ -71,7 +71,7 @@ namespace MopedNS {
 				Keypoint keypts = GetKeypoints(image);
 				Keypoint key = keypts;
 				while (key) {
-					int m = key->row, n = key->col;
+					double m = key->row, n = key->col;
 					//bool CloudFlag = CloudDepthExist( cloud, m, n );
 					if ( cloudMask[m][n] == true /*&& CloudFlag == true*/ ) {
 						bool CloudFlag = CloudDepthExist( cloud, m, n );
@@ -84,6 +84,10 @@ namespace MopedNS {
 							}
 							detectedFeatures.back().coord2D[0] = key->col;
 							detectedFeatures.back().coord2D[1] = key->row;
+//							cv::Point pt;
+//							pt.x = key->col;
+//							pt.y = key->row;
+//							cv::circle( cvImage, pt, 5, cv::Scalar::all(0), 2 );
 							detectedFeatures.back().cloud3D[0] = cloud->points[m*cloud->width+n].x*100;
 							detectedFeatures.back().cloud3D[1] = cloud->points[m*cloud->width+n].y*100;
 							detectedFeatures.back().cloud3D[2] = cloud->points[m*cloud->width+n].z*100;
@@ -93,6 +97,8 @@ namespace MopedNS {
 				}	
 				FreeKeypoints(keypts);
 				DestroyAllImages();   // we can't destroy just one!
+//				cv::imshow( "feat", cvImage );
+//				cv::waitKey( 10 );
 			}
 		}
 	};

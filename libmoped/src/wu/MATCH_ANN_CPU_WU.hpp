@@ -117,31 +117,26 @@ namespace MopedNS {
 
 		void process( FrameData &frameData ) {
 //			cout << "MATCH_ANN_CPU\n";
-			/* This step is critical and the configUpdated is defined in util.hpp
-			 * And it seems the configUpdated is true */
 			if( configUpdated ) 
 				Update();
 			if( skipCalculation ) 
 				return;			
-
 			vector< FrameData::DetectedFeature > &corresp = frameData.detectedFeatures[DescriptorType];
 			if( corresp.empty() )
 				return;
-
 			vector< vector< FrameData::Match > > &matches = frameData.matches;
-
-			/* 1st vector represents the models' number
-			 * 2nd vector represents the number for matches correpounding to each model */
 			matches.resize( models->size() );
 			ANNpoint pt = annAllocPt(DescriptorSize);
-			/* ANNidx is typedef as int
-			 * so, we get
-			 * int* nx = new int[2];
-			 * float* nx = new float[2] */
 			ANNidxArray	nx = new ANNidx[2];
 			ANNdistArray ds = new ANNdist[2];
 			int k;
 
+			Image *img = frameData.images[0].get();
+			cv::Mat cvImage( img->height, img->width, CV_8UC1 );
+			for (int y = 0; y < img->height; y++) 
+				for (int x = 0; x < img->width; x++) 
+					cvImage.at<uchar>(y, x) = (float)img->data[img->width*y+x];
+			
 			/* corresp.size() is assumed to be the number of extracted features
 			 * so the out iteraation is the number of whole features */
 			for( int i=0; i<(int)corresp.size(); i++)  {
@@ -175,8 +170,14 @@ namespace MopedNS {
 					match.coord2D = corresp[i].coord2D;
 					match.cloud3D = corresp[i].cloud3D;
 					match.featIdx = objFeatIdx;
+//					cv::Point pt;
+//					pt.x = corresp[i].coord2D[0];
+//					pt.y = corresp[i].coord2D[1];
+//					cv::circle( cvImage, pt, 5, cv::Scalar::all(0), 2 );					
 				}
-			}	
+			}
+//			cv::imshow( "match", cvImage );
+//			cv::waitKey( 10 );			
 		}
 	};
 };
