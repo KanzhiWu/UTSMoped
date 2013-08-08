@@ -72,7 +72,7 @@ private:
 
 public:
 	WuROS():it_(nh_),
-	rgbImage(nh_, "/camera/rgb/image_color", 1),
+	rgbImage(nh_, "/camera/rgb/image_rect_color", 1),
 	depthImage(nh_, "/camera/depth_registered/image_rect_raw", 1),
 	cloud(nh_, "/camera/depth_registered/points", 1),
 	sync(wuROSsync(10), rgbImage, depthImage, cloud) {
@@ -291,7 +291,7 @@ public:
 				string DescriptorType = object->model->IPs.begin()->first;
 				int icolor = (unsigned)rng;
 				clog << " Found " << object->model->name << " at " << object->pose << " with score " << object->score << endl;
-				/*
+				/*				
 				varphi 	= 2*( object->pose.rotation[3]*object->pose.rotation[0] + object->pose.rotation[1]*object->pose.rotation[2] )
 						  /( 1-2*(pow(object->pose.rotation[0], 2)+pow(object->pose.rotation[1], 2)) );
 				theta 	= 2*( object->pose.rotation[3]*object->pose.rotation[1]-object->pose.rotation[2]*object->pose.rotation[0] );
@@ -301,6 +301,7 @@ public:
 				theta = asin( theta ) * 180/PI;
 				psi = atan( psi ) * 180/PI;
 				cout << "Pose Eular angle: " << varphi << ", " << theta << ", " << psi << endl;
+
 				int featNumber = object->model->IPs[DescriptorType].size();
 				int ptIndex;
 				MopedNS::Pt<3> pt3It;

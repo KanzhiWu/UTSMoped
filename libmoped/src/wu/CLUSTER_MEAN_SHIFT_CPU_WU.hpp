@@ -8,8 +8,8 @@
 #pragma once
 
 namespace MopedNS {
-	bool g_start = false;
-	bool *clusterObvFlag = new bool[10];
+	bool g_start_wu = false;
+	bool *clusterObvFlag_wu = new bool[10];
 
 	class CLUSTER_MEAN_SHIFT_CPU_WU :public MopedAlg {
 
@@ -129,6 +129,7 @@ namespace MopedNS {
 		void process( FrameData &frameData ) {
 			frameData.clusters.resize( models->size() );
 			pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = frameData.cloudPclPtr;
+			
 			#pragma omp parallel for
 			for( int model = 0; model < (int)frameData.matches.size(); model ++) {
 				vector< vector< pair<Pt<2>, int> > > pointsPerImage( frameData.images.size() ) ;
@@ -139,6 +140,18 @@ namespace MopedNS {
 					MeanShift( frameData.clusters[model], pointsPerImage[i], Radius, Merge, MinPts, MaxIterations );
 				}
 			}
+			/*
+			#pragma omp parallel for
+			for( int model = 0; model < (int)frameData.matches.size(); model ++) {
+				vector< vector< pair<Pt<3>, int> > > pointsPerImage( frameData.images.size() ) ;
+				for( int match = 0; match < (int)frameData.matches[model].size(); match ++) {
+					pointsPerImage[frameData.matches[model][match].imageIdx].push_back( make_pair( frameData.matches[model][match].cloud3D, match ) );
+				}
+				for( int i=0; i<(int)frameData.images.size(); i++ ) {
+					MeanShift( frameData.clusters[model], pointsPerImage[i], Radius, Merge, MinPts, MaxIterations );
+				}
+			}			
+			*/
 			if( _stepName == "CLUSTER" ) 
 				frameData.oldClusters = frameData.clusters;
 		}

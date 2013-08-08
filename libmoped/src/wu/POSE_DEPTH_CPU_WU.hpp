@@ -26,12 +26,8 @@ namespace MopedNS {
 			Pt<3> obser3d;
 		};
 
-		// This function populates "samples" with nSamples references to object correspondences
-		// The samples are randomly choosen, and aren't repeated
 		bool randSample( vector<Match3DData *> &samples, const vector<Match3DData *> &cluster, unsigned int nSamples) {
-			// Do not add a correspondence of the same image at the same coordinate
 			map<pair<Image *, Pt<3> >, int> used;
-			// Create a vector of samples prefixed with a random int. The int has preference over the pointer when sorting the vector.
 			deque<pair<Float, Match3DData *> > randomSamples;
 			foreach( match, cluster )
 				randomSamples.push_back( make_pair( (Float)rand(), match ) );
@@ -46,14 +42,11 @@ namespace MopedNS {
 		}
 
 		void testAllPoints( vector<Match3DData *> &consistentCorresp, const Pose &pose, const vector<Match3DData *> &testPoints, const Float ErrorThreshold ) {
-//			cout << "test all points ...\n";
 			consistentCorresp.clear();
 			foreach( corresp, testPoints ) {
 				Pt<3> p = project3d( pose, corresp->model3d, *corresp->image );
-//				cout << " " << corresp->obser3d << " " << p;
 				p -= corresp->obser3d;
 				Float projectionError = p[0]*p[0]+p[1]*p[1]+p[2]*p[2];
-//				cout << " " << projectionError << endl;
 				if( projectionError < ErrorThreshold )
 					consistentCorresp.push_back(corresp);
 			}
@@ -62,6 +55,21 @@ namespace MopedNS {
 		void initPose( Pose &pose, const vector<Match3DData *> &samples ) {
 			pose.rotation.init( (rand()&255)/256., (rand()&255)/256., (rand()&255)/256., (rand()&255)/256. );
 			pose.translation.init( 0.,0.,0.5 );
+		}
+		
+		bool DistSample( vector<Match3DData *> samples ) {
+			int num = samples.size();
+			for ( int i = 0; i < num; i ++ ) {
+				for ( int j = i+1; j < num; j ++ ) {
+					Pt<3> pt1 = samples[i]->obser3d; Pt<3> pt2 = samples[j]->model3d;
+					double dist = sqrt(	(pt1[0]-pt2[0])*(pt1[0]-pt2[0]) +
+											(pt1[1]-pt2[1])*(pt1[1]-pt2[1]) +
+											(pt1[2]-pt2[2])*(pt1[2]-pt2[2]) );
+					if ( dist < 0.5 )
+						return true;
+				}
+			}
+			return true;
 		}
 		
 		void NormalCalc( vector<Pt<3> > pts, Pt<3> &normal ) {
@@ -78,41 +86,21 @@ namespace MopedNS {
 		}
 		
 		bool PlanarSamples( vector<Match3DData *> samples ) {
-			int numSamples = (int)samples.size();
-			vector<Pt<3> > pts;
-			pts.resize( numSamples );
-			for ( int i = 0; i < numSamples; i ++ ) {
-				Pt<3> pt = samples[i]->model3d;
-				pts[i] = pt;
-			}
-			map<int, int> used;
 			vector<Pt<3> > normalPts;
-			int idx = 0;
-			while (idx < 3) {
-				int seed = rand()%numSamples;
-				if ( !used[seed] ++ ) {
-					normalPts.push_back( pts[seed] );
-					idx ++;
-				}
-			}
+			normalPts.resize(3);
+			for ( int i = 0; i < 3; i ++ ) 
+				normalPts[i] = samples[i]->model3d;
 			Pt<3> normal;
 			NormalCalc( normalPts, normal );
-			double proDist = 0.;
-			double lNormal = sqrt(normal[0]*normal[0]+normal[1]*normal[1]+normal[2]*normal[2]);
-			for ( int i = 0; i < numSamples; i ++ ) {
-				if (!used[i] ++) {
-					double dist =abs(( normal[0]*pts[i][0] +
-										normal[1]*pts[i][1] +
-										normal[2]*pts[i][2])/(lNormal*lNormal) );
-					proDist += dist;
-				}
-			}
-			double DistThreshold = 5.0;
-			if ( proDist > DistThreshold )
+			double dNormal = sqrt(normal[0]*normal[0]+normal[1]*normal[1]+normal[2]*normal[2]);
+			Pt<3> testPt = samples[3]->model3d;
+			double dist = abs( (normal[0]*testPt[0] +
+			                     normal[1]*testPt[1] +
+			                     normal[2]*testPt[2])/(dNormal*dNormal) );
+			if ( dist > 0.5 )
 				return true;
 			else
 				return false;
-			
 		}
 		
 		void Match2Matrix( vector<Match3DData *> samples, Eigen::MatrixXd &matModel, Eigen::MatrixXd &matObser ) {
@@ -165,7 +153,7 @@ namespace MopedNS {
 			return sum;
 		}		
 		
-		void PoseDepth( vector<Match3DData *> samples, bool flag, Pose &pose ) {
+		bool PoseDepth( vector<Match3DData *> samples, bool flag, Pose &pose ) {
 			int ptNum = samples.size();
 			Eigen::MatrixXd matModel(ptNum, 3), matObser(ptNum, 3);	
 			Match2Matrix( samples, matModel, matObser );
@@ -173,6 +161,7 @@ namespace MopedNS {
 			AveMatrix( matModel, aveModel );
 			AveMatrix( matObser, aveObser );
 			MatrixNormalize( matModel ); MatrixNormalize( matObser );
+//			cout << "\nModel: \n" << matModel << "\nObservation: \n"<< matObser << endl;
 			double sumModel = SumNorm( matModel );
 			double sumObser = SumNorm( matObser );		
 
@@ -206,50 +195,91 @@ namespace MopedNS {
 				svdv(2,2) *= -1;
 				rotation = svdv * (svdu.transpose());
 			}
+			Eigen::MatrixXd matModelT = matModel.transpose();
+			Eigen::MatrixXd matObserE = rotation*matModelT;
+			Eigen::MatrixXd matObserT = matObser.transpose();
+			Eigen::MatrixXd errorET = matObserE - matObserT;
+			double rmse = 0.0;
+			for ( int i = 0; i < errorET.rows(); i ++ ) {
+				for ( int j = 0; j < errorET.cols(); j ++ ) {
+					errorET(i,j) *= errorET(i,j);
+					rmse += errorET(i,j);
+				}
+			}
+			rmse = sqrt( rmse );
+			if ( rmse > 10 )
+				return false;
+//			translation = aveObser - aveModel;
 			translation = aveObser - rotation * aveModel;
-			Pt<4> rot;
-			double tr = rotation(0,0) + rotation(1,1) + rotation(2,2);
-			if ( tr > 0 ) {
-				double S = sqrt(tr+1.0)*2;
-				rot[0] = (rotation(2,1) - rotation(1,2))/S;
-				rot[1] = (rotation(0,2) - rotation(2,0))/S;
-				rot[2] = (rotation(1,0) - rotation(0,1))/S;
-				rot[3] = 0.25*S;
+//			cout << "\nModel: \n" << matModel << "\nObservation: \n" << matObser << "\n";
+//			cout << "U: \n" << svdu << "\nV: \n" << svdv;
+			cout << "\nRotation: \n" << rotation << "\nTranslation: \n" << translation << "\n";
+//			cout << "rmse: " << rmse << "\n";
+
+			// rotation matrix to quaternion
+			Pt<4> quat, quat1;
+			quat1[0] = sqrt(1.0+rotation(0,0)+rotation(1,1)+rotation(2,2))/2;
+			quat1[1] = (rotation(2,1)-rotation(1,2))/(4*quat1[0]);
+			quat1[2] = (rotation(0,2)-rotation(2,0))/(4*quat1[0]);
+			quat1[3] = (rotation(1,0)-rotation(0,1))/(4*quat1[0]);
+			/*
+			quat[0] = ( rotation(0,0)+rotation(1,1)+rotation(2,2)+1.0)/4;
+			quat[1] = ( rotation(0,0)-rotation(1,1)-rotation(2,2)+1.0)/4;
+			quat[2] = (-rotation(0,0)+rotation(1,1)-rotation(2,2)+1.0)/4;
+			quat[3] = (-rotation(0,0)-rotation(1,1)+rotation(2,2)+1.0)/4;
+			for ( int i = 0; i < 4; i ++ ) {
+				if ( quat[i] < 0.0 )
+					quat[i] = 0.0;
 			}
-			else if ( rotation(0,0)>rotation(1,1) &&
-			           rotation(0,0)>rotation(2,2) ) {
-				double S = sqrt(1.0+rotation(0,0)-rotation(1,1)-rotation(2,2))*2;
-				rot[0] = 0.25*S;
-				rot[1] = (rotation(0,1)+rotation(1,0))/S;
-				rot[2] = (rotation(0,2)+rotation(2,0))/S;
-				rot[3] = (rotation(2,1)-rotation(1,2))/S;
+			for ( int i = 0; i < 4; i ++ )
+				quat[i] = sqrt( quat[i] );
+			if ( quat[0] >= quat[1] && quat[0] >= quat[2] && quat[0] >= quat[3] ) {
+				quat[0] *= 1.0;
+				quat[1] *= (rotation(2,1)-rotation(1,2) > 0);
+				quat[2] *= (rotation(0,2)-rotation(2,0) > 0);
+				quat[3] *= (rotation(1,0)-rotation(0,1) > 0);
 			}
-			else if ( rotation(1,1) > rotation(2,2) ) {
-				double S = sqrt(1.0+rotation(1,1)-rotation(0,0)-rotation(2,2))*2;
-				rot[0] = (rotation(0,1)+rotation(1,0))/S;
-				rot[1] = 0.25*S;
-				rot[2] = (rotation(1,2)+rotation(2,1))/S;
-				rot[3] = (rotation(0,2)-rotation(2,0))/S;
+			else if ( quat[1] >= quat[0] && quat[1] >= quat[2] && quat[1] >= quat[3] ) {
+				quat[0] *= (rotation(2,1)-rotation(1,2) > 0);
+				quat[1] *= 1.0;
+				quat[2] *= (rotation(1,0)+rotation(0,1) > 0);
+				quat[3] *= (rotation(0,2)+rotation(2,0) > 0);
 			}
-			else {
-				double S = sqrt(1.0+rotation(2,2)-rotation(0,0)-rotation(1,1))*2;
-				rot[0] = (rotation(0,2)+rotation(2,0))/S;
-				rot[1] = (rotation(1,2)+rotation(2,1))/S;
-				rot[2] = 0.25*S;
-				rot[3] = (rotation(1,0)-rotation(0,1))/S;
+			else if ( quat[2] >= quat[0] && quat[2] >= quat[1] && quat[2] >= quat[3] ) {
+				quat[0] *= (rotation(0,2)-rotation(2,0) > 0);
+				quat[1] *= (rotation(1,0)+rotation(0,1) > 0);
+				quat[2] *= 1.0;
+				quat[3] *= (rotation(2,1)+rotation(1,2) > 0);
+			}
+			else if ( quat[3] >= quat[0] && quat[3] >= quat[1] && quat[3] >= quat[2] ) {
+				quat[0] *= (rotation(1,0)-rotation(0,1) > 0);
+				quat[1] *= (rotation(0,2)+rotation(2,0) > 0);
+				quat[2] *= (rotation(2,1)+rotation(1,2) > 0);
+				quat[3] *= 1.0; 
 			}
 			
+			double nQuat = 0.0;
+			for ( int i = 0; i < 4; i ++ )
+				nQuat += quat[i]*quat[i];
+			nQuat = sqrt(nQuat);
+			for ( int i = 0; i < 4; i ++ )
+				quat[i] /= nQuat;	
+			*/	
+			
+			double nQuat1 = 0.0;
+			for ( int i = 0; i < 4; i ++ )
+				nQuat1 += quat1[i]*quat1[i];
+			nQuat1 = sqrt(nQuat1);
+			for ( int i = 0; i < 4; i ++ )
+				quat1[i] /= nQuat1;	
 			Pt<3> trans;
-			trans[0] = translation(0,0);
+				trans[0] = translation(0,0);
 			trans[1] = translation(1,0);
 			trans[2] = translation(2,0);
 			pose.translation = trans;
-			pose.rotation[0] = rot[0];
-			pose.rotation[1] = rot[1];
-			pose.rotation[2] = rot[2];
-			pose.rotation[3] = rot[3]; 
-			
-//			cout << pose.rotation << " " << pose.translation;
+			pose.rotation = quat1;
+			return true;
+			//cout << pose.rotation << " " << pose.translation;
 			//getchar();
 			/*
 			double phi, theta, psi;
@@ -271,16 +301,28 @@ namespace MopedNS {
 				samples.clear();
 				if( !randSample( samples, cluster, NPtsAlign ) ) 
 					return false;
-				initPose( pose, samples );
-//				bool PlanarFlag = PlanarSamples( samples );
-				bool PlanarFlag = false;
-				PoseDepth( samples, PlanarFlag, pose );
-				vector<Match3DData *> consistent;
-				testAllPoints( consistent, pose, cluster, ErrorThreshold );
-				cout << "consistent size: " << (int)consistent.size() << endl;
-				if ( (int)consistent.size() > MinNPtsObject ) {
-					PoseDepth( consistent, PlanarFlag, pose );					
-					return true;
+				if ( DistSample( samples ) ) {
+//					cout << "Pose estimation ....\n";
+					initPose( pose, samples );
+//					bool PlanarFlag = PlanarSamples( samples );
+					bool PlanarFlag = false;
+					/*
+					PoseDepth( samples, PlanarFlag, pose );
+					vector<Match3DData *> consistent;
+					testAllPoints( consistent, pose, cluster, ErrorThreshold );
+					if ( (int)consistent.size() > MinNPtsObject ) {
+						PoseDepth( consistent, PlanarFlag, pose );					
+						return true;
+					}
+					*/
+					if ( PoseDepth( samples, PlanarFlag, pose ) ) {
+						vector<Match3DData *> consistent;
+						testAllPoints( consistent, pose, cluster, ErrorThreshold );
+						if ( (int)consistent.size() > MinNPtsObject ) {
+							PoseDepth( consistent, PlanarFlag, pose );					
+							return true;
+						}						
+					}
 				}
 			}
 			return false;
@@ -368,7 +410,7 @@ namespace MopedNS {
 						tasks.push_back( make_pair(model, cluster) );
 			}
 
-//			#pragma omp parallel for
+			//#pragma omp parallel for
 			for(int task = 0; task < (int)tasks.size(); task ++) {
 				int model = tasks[task].first;
 				int cluster = tasks[task].second;
@@ -387,7 +429,7 @@ namespace MopedNS {
 				 * 		default threads set which is 4, the number of push_back
 				 * 		  */
 				if ( found > 0 ) {
-					cout << "found object ...\n";
+					cout << "found one object ...\n";
 					#pragma omp critical(POSE)
 					{
 						SP_Object obj(new Object);

@@ -136,7 +136,7 @@ namespace MopedNS {
 			for (int y = 0; y < img->height; y++) 
 				for (int x = 0; x < img->width; x++) 
 					cvImage.at<uchar>(y, x) = (float)img->data[img->width*y+x];
-			
+			int centerx = cvImage.cols/2, centery = cvImage.rows/2;
 			/* corresp.size() is assumed to be the number of extracted features
 			 * so the out iteraation is the number of whole features */
 			for( int i=0; i<(int)corresp.size(); i++)  {
@@ -170,14 +170,20 @@ namespace MopedNS {
 					match.coord2D = corresp[i].coord2D;
 					match.cloud3D = corresp[i].cloud3D;
 					match.featIdx = objFeatIdx;
-//					cv::Point pt;
-//					pt.x = corresp[i].coord2D[0];
-//					pt.y = corresp[i].coord2D[1];
-//					cv::circle( cvImage, pt, 5, cv::Scalar::all(0), 2 );					
+					/*
+					cv::Point pt;
+					pt.x = corresp[i].coord2D[0];
+					pt.y = corresp[i].coord2D[1];
+					if ( pt.x > centerx - 25 && pt.x < centerx + 25 && pt.y > centery - 80 && pt.y < centery - 30 ) {
+						cv::circle( cvImage, pt, 5, cv::Scalar::all(0), 2 );
+						cout << match.cloud3D << " " << match.coord3D << endl;					
+					}
+					*/ 
 				}
 			}
-//			cv::imshow( "match", cvImage );
-//			cv::waitKey( 10 );			
+			//cv::imshow( "match", cvImage );
+			//cv::waitKey( 10 );
+
 		}
 	};
 };

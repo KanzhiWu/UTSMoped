@@ -17,7 +17,7 @@ namespace MopedNS {
 
 		string ScaleOrigin;
 		
-		bool CloudDepthExist( pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, double row, double col ) {
+		bool CloudDepthExist( pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int row, int col ) {
 			double x = cloud->points[row*cloud->width+col].x*100;
 			double y = cloud->points[row*cloud->width+col].y*100;
 			double z = cloud->points[row*cloud->width+col].z*100;
@@ -71,7 +71,7 @@ namespace MopedNS {
 				Keypoint keypts = GetKeypoints(image);
 				Keypoint key = keypts;
 				while (key) {
-					double m = key->row, n = key->col;
+					int m = key->row, n = key->col;
 					//bool CloudFlag = CloudDepthExist( cloud, m, n );
 					if ( cloudMask[m][n] == true /*&& CloudFlag == true*/ ) {
 						bool CloudFlag = CloudDepthExist( cloud, m, n );

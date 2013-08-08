@@ -18,14 +18,14 @@
 #include <match/MATCH_ANN_CPU.hpp>
 #include <match/MATCH_DISPLAY.hpp>
 
-//#include <cluster/CLUSTER_MEAN_SHIFT_CPU.hpp>
+#include <cluster/CLUSTER_MEAN_SHIFT_CPU.hpp>
 #include <cluster/CLUSTER_DISPLAY.hpp>
 
 #include <pose/POSE_RANSAC_LM_DIFF_REPROJECTION_CPU.hpp>
 #include <pose/POSE_DISPLAY.hpp>
 
 #include <filter/FILTER_PROJECTION_CPU.hpp>
-
+#include <filter/DEPTH_VERIFICATION.hpp>
 #include <STATUS_DISPLAY.hpp>
 #include <GLOBAL_DISPLAY.hpp>
 #include <GLOBAL_DISPLAY_WU.hpp>
@@ -36,7 +36,7 @@
 #include <wu/MATCH_ANN_CPU_WU.hpp>
 #include <wu/POSE_DEPTH_CPU_WU.hpp>
 #include <wu/CLUSTER_DISPLAY_WU.hpp>
-#include <wu/CLUSTER_MEAN_SHIFT_CPU_WU.hpp>
+//#include <wu/CLUSTER_MEAN_SHIFT_CPU_WU.hpp>
 //#include <MATCH_ANN_WU.hpp>
 //#include <POSE_RANSAC_ICP_WU.hpp>
 //#include <PROB_DISPLAY_WU.hpp>
@@ -49,15 +49,18 @@ namespace MopedNS {
 
 	void createPipeline( MopedPipeline &pipeline ) {
 		// UTS pipeline
-		
+		/*				
 //		pipeline.addAlg( "MODEL_PROCESS", new MODEL_PROCESS );
 		pipeline.addAlg( "PLANE_REMOVAL", new PLANE_EXTRACTION(0., 0., 0., 0., 0.) );
 		pipeline.addAlg( "SIFT", new FEAT_SIFT_CPU_WU("-1") );
 		pipeline.addAlg( "MATCH_SIFT", new MATCH_ANN_CPU_WU( 128, "SIFT", 5., 0.8) );
-		pipeline.addAlg( "CLUSTER", new CLUSTER_MEAN_SHIFT_CPU_WU( 200, 20, 7, 100) );
-		pipeline.addAlg( "DEPTH_POSE", new POSE_DEPTH_CPU_WU( 100, 4, 4, 8, 20 ) );
-		pipeline.addAlg( "GLOBAL_DISPLAY", new GLOBAL_DISPLAY( 2 ) );
-		/*
+		pipeline.addAlg( "CLUSTER", new CLUSTER_MEAN_SHIFT_CPU_WU(200, 20, 7, 100) );
+		pipeline.addAlg( "DEPTH_POSE", new POSE_DEPTH_CPU_WU( 500, 4, 4, 8, 20 ) );
+		pipeline.addAlg( "POSE_DISPLAY", new POSE_DISPLAY(3) );
+//		pipeline.addAlg( "STATUS_DISPLAY", new STATUS_DISPLAY( DEFAULT_DISPLAY_LEVEL ) );
+//		pipeline.addAlg( "GLOBAL_DISPLAY", new GLOBAL_DISPLAY( 2 ) );
+		*/
+
 		pipeline.addAlg( "UNDISTORTED_IMAGE", new UTIL_UNDISTORT );		
 		pipeline.addAlg( "SIFT", new FEAT_SIFT_CPU("-1") );
 		pipeline.addAlg( "MATCH_SIFT", new MATCH_ANN_CPU( 128, "SIFT", 5., 0.8) );
@@ -66,9 +69,10 @@ namespace MopedNS {
 		pipeline.addAlg( "FILTER", new FILTER_PROJECTION_CPU( 5, 4096., 2) );
 		pipeline.addAlg( "POSE2", new POSE_RANSAC_LM_DIFF_REPROJECTION_CPU( 100, 500, 4, 6, 8, 5) );
 		pipeline.addAlg( "FILTER2", new FILTER_PROJECTION_CPU( 7, 4096., 5) );
-		pipeline.addAlg( "GLOBAL_DISPLAY", new GLOBAL_DISPLAY( 2 ) );
-//		pipeline.addAlg( "DEPTH", new DEPTH_VERIFICATION(0., 100, 500, 4, 6, 8, 5) );
+		pipeline.addAlg( "DEPTH", new DEPTH_VERIFICATION(0., 100, 500, 4, 6, 8, 5) );
+		pipeline.addAlg( "POSE_DISPLAY", new POSE_DISPLAY(3) );
+//		pipeline.addAlg( "GLOBAL_DISPLAY", new GLOBAL_DISPLAY( 2 ) );
 //		pipeline.addAlg( "STATUS_DISPLAY", new STATUS_DISPLAY( DEFAULT_DISPLAY_LEVEL ) );
-		*/
+
 	}
 };

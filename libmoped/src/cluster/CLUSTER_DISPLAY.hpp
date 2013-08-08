@@ -86,7 +86,7 @@ namespace MopedNS {
 				cvShowImage( windowName.c_str(), img );
 				cvReleaseImage(&img);
 			}
-			
+			/*
 			for( int i = 0; i < (int)frameData.images.size(); i ++) {
 				string windowName = _stepName + " #" + toString(i) + ":" + frameData.images[i]->name;
 				cvNamedWindow( windowName.c_str(), CV_WINDOW_AUTOSIZE);
@@ -116,7 +116,7 @@ namespace MopedNS {
 				cvReleaseImage(&img);
 								
 			}
-			
+			*/
 			
 			cvWaitKey( 10 );
 		}
