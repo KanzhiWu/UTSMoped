@@ -126,15 +126,15 @@ namespace MopedNS {
 			SET_CONFIG( MaxIterations );
 		}
 
-		void process( FrameData &frameData ) {
-			frameData.clusters.resize( models->size() );
-			pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = frameData.cloudPclPtr;
-			
+		void process( FrameData &frameData ) {			
+			frameData.clusters.resize( models->size() );			
 			#pragma omp parallel for
 			for( int model = 0; model < (int)frameData.matches.size(); model ++) {
 				vector< vector< pair<Pt<2>, int> > > pointsPerImage( frameData.images.size() ) ;
 				for( int match = 0; match < (int)frameData.matches[model].size(); match ++) {
-					pointsPerImage[frameData.matches[model][match].imageIdx].push_back( make_pair( frameData.matches[model][match].coord2D, match ) );
+					Pt<2> pt;
+					pt.init( frameData.matches[model][match].cloud3D[0], frameData.matches[model][match].cloud3D[1] );
+					pointsPerImage[frameData.matches[model][match].imageIdx].push_back( make_pair( pt, match ) );
 				}
 				for( int i=0; i<(int)frameData.images.size(); i++ ) {
 					MeanShift( frameData.clusters[model], pointsPerImage[i], Radius, Merge, MinPts, MaxIterations );

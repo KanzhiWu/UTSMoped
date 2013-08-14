@@ -8,8 +8,6 @@ function [R,t] = pose_inv(A, B)
     [U,S,V] = svd(H);
     %disp('Coplanar points!');
     V(:,3) = -V(:,3);
-    U
-    V
-    R = V*U';
+    R = V*U'
     t = -R*centroid_A' + centroid_B';
 end

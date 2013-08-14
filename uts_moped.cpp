@@ -115,16 +115,16 @@ public:
 
 		//Camera parameters
 		double d1, d2, d3, d4;
-		nh_.param("KK_fx", d1, 529.21);
-		nh_.param("KK_fy", d2, 525.56);
-		nh_.param("KK_cx", d3, 328.94);
-		nh_.param("KK_cy", d4, 267.48);
+		nh_.param("KK_fx", d1, 543.22);
+		nh_.param("KK_fy", d2, 543.31);
+		nh_.param("KK_cx", d3, 317.81);
+		nh_.param("KK_cy", d4, 265.91);
 		intrinsicLinearCalibration.init(d1, d2, d3, d4);
 
-		nh_.param("kc_k1", d1, 0.264);
-		nh_.param("kc_k2", d2, -0.328);
-		nh_.param("kc_p1", d3, 1e-12);
-		nh_.param("kc_p2", d4, 1e-12);
+		nh_.param("kc_k1", d1, 0.284);
+		nh_.param("kc_k2", d2, -0.757);
+		nh_.param("kc_p1", d3, 0.00);
+		nh_.param("kc_p2", d4, 0.00);
 		intrinsicNonlinearCalibration.init(d1, d2, d3, d4);
 
 		// read the config.hpp, load algorithm steps and parameters
@@ -287,11 +287,12 @@ public:
 			int observeCnt;
 			double varphi, theta, psi;
 			varphi = 0.0; theta = 0.0; psi = 0.0;
+			double phi_ = 0.0, theta_ = 0.0, psi_ = 0.0;
 			foreach( object, objects ) {
 				string DescriptorType = object->model->IPs.begin()->first;
 				int icolor = (unsigned)rng;
 				clog << " Found " << object->model->name << " at " << object->pose << " with score " << object->score << endl;
-				/*				
+				/*								
 				varphi 	= 2*( object->pose.rotation[3]*object->pose.rotation[0] + object->pose.rotation[1]*object->pose.rotation[2] )
 						  /( 1-2*(pow(object->pose.rotation[0], 2)+pow(object->pose.rotation[1], 2)) );
 				theta 	= 2*( object->pose.rotation[3]*object->pose.rotation[1]-object->pose.rotation[2]*object->pose.rotation[0] );
@@ -301,6 +302,18 @@ public:
 				theta = asin( theta ) * 180/PI;
 				psi = atan( psi ) * 180/PI;
 				cout << "Pose Eular angle: " << varphi << ", " << theta << ", " << psi << endl;
+				
+				double phi_nu = 2*object->pose.rotation[1]*object->pose.rotation[3]-2*object->pose.rotation[0]*object->pose.rotation[2];
+				double phi_de = 1-2*object->pose.rotation[1]*object->pose.rotation[1]-2*object->pose.rotation[2]*object->pose.rotation[2];
+				phi_ = atan2( phi_nu, phi_de )*180/PI;
+				double theta_ = asin( 2*object->pose.rotation[0]*object->pose.rotation[1]+2*object->pose.rotation[2]*object->pose.rotation[3] )*180/PI;
+				double psi_nu = 2*object->pose.rotation[0]*object->pose.rotation[3]-2*object->pose.rotation[1]*object->pose.rotation[2];
+				double psi_de = 1-2*object->pose.rotation[0]*object->pose.rotation[0]-2*object->pose.rotation[2]*object->pose.rotation[2];
+				double psi_ = atan2( psi_nu, psi_de )*180/PI;
+				
+				cout << "------------------------------------------\n";
+				cout << "Pose Eular angle: " << phi_ << ", " << theta_ << ", " << psi_ << endl;
+				getchar();
 
 				int featNumber = object->model->IPs[DescriptorType].size();
 				int ptIndex;

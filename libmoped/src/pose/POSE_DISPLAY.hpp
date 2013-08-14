@@ -101,7 +101,7 @@ namespace MopedNS {
 				}
 
 				cvShowImage( windowName.c_str(), img );
-
+				
 				cvReleaseImage(&img);
 			}
 

@@ -153,7 +153,11 @@ namespace MopedNS {
 			return sum;
 		}		
 		
-		bool PoseDepth( vector<Match3DData *> samples, bool flag, Pose &pose ) {
+		bool PoseDepth( vector<Match3DData *> samples, Pose &pose ) {
+//			cout << "The number of samples is " << samples.size() << endl;
+//			for ( int i = 0; i < samples.size(); i++ ) {
+//				cout << samples[i]->obser3d << " " << samples[i]->model3d << endl;
+//			}
 			int ptNum = samples.size();
 			Eigen::MatrixXd matModel(ptNum, 3), matObser(ptNum, 3);	
 			Match2Matrix( samples, matModel, matObser );
@@ -161,7 +165,6 @@ namespace MopedNS {
 			AveMatrix( matModel, aveModel );
 			AveMatrix( matObser, aveObser );
 			MatrixNormalize( matModel ); MatrixNormalize( matObser );
-//			cout << "\nModel: \n" << matModel << "\nObservation: \n"<< matObser << endl;
 			double sumModel = SumNorm( matModel );
 			double sumObser = SumNorm( matObser );		
 
@@ -181,12 +184,15 @@ namespace MopedNS {
 				Eigen::Matrix3d product;
 				product = vecModel * vecObser;
 				sumProduct = sumProduct + product;	
-				Eigen::JacobiSVD<Eigen::MatrixXd> svd(sumProduct, Eigen::ComputeThinU | Eigen::ComputeThinV);
-				svdu = svd.matrixU();
-				svdv = svd.matrixV();
+
 								
 			}
-			if ( flag == false ) {
+			Eigen::JacobiSVD<Eigen::MatrixXd> svd(sumProduct, Eigen::ComputeThinU | Eigen::ComputeThinV);
+			svdu = svd.matrixU();
+			svdv = svd.matrixV();
+			Eigen::MatrixXd tmp = svdv*(svdu.transpose());
+			double det = tmp.determinant();
+			if ( abs(det-1)<0.1 ) {
 				rotation = svdv * (svdu.transpose());
 			}
 			else {
@@ -195,6 +201,7 @@ namespace MopedNS {
 				svdv(2,2) *= -1;
 				rotation = svdv * (svdu.transpose());
 			}
+
 			Eigen::MatrixXd matModelT = matModel.transpose();
 			Eigen::MatrixXd matObserE = rotation*matModelT;
 			Eigen::MatrixXd matObserT = matObser.transpose();
@@ -207,93 +214,67 @@ namespace MopedNS {
 				}
 			}
 			rmse = sqrt( rmse );
-			if ( rmse > 10 )
-				return false;
-//			translation = aveObser - aveModel;
+//			if ( rmse > 10 )
+//				return false;
 			translation = aveObser - rotation * aveModel;
-//			cout << "\nModel: \n" << matModel << "\nObservation: \n" << matObser << "\n";
-//			cout << "U: \n" << svdu << "\nV: \n" << svdv;
-			cout << "\nRotation: \n" << rotation << "\nTranslation: \n" << translation << "\n";
-//			cout << "rmse: " << rmse << "\n";
+	//		cout << "\nRotation: \n" << rotation << "\nTranslation: \n" << translation << "\n";
 
 			// rotation matrix to quaternion
-			Pt<4> quat, quat1;
-			quat1[0] = sqrt(1.0+rotation(0,0)+rotation(1,1)+rotation(2,2))/2;
-			quat1[1] = (rotation(2,1)-rotation(1,2))/(4*quat1[0]);
-			quat1[2] = (rotation(0,2)-rotation(2,0))/(4*quat1[0]);
-			quat1[3] = (rotation(1,0)-rotation(0,1))/(4*quat1[0]);
-			/*
-			quat[0] = ( rotation(0,0)+rotation(1,1)+rotation(2,2)+1.0)/4;
-			quat[1] = ( rotation(0,0)-rotation(1,1)-rotation(2,2)+1.0)/4;
-			quat[2] = (-rotation(0,0)+rotation(1,1)-rotation(2,2)+1.0)/4;
-			quat[3] = (-rotation(0,0)-rotation(1,1)+rotation(2,2)+1.0)/4;
-			for ( int i = 0; i < 4; i ++ ) {
-				if ( quat[i] < 0.0 )
-					quat[i] = 0.0;
+			Pt<4> quat1;
+
+			double tr = rotation(0,0)+rotation(1,1)+rotation(2,2);
+			if ( tr > 0 ) {
+				double S = sqrt(tr+1.0)*2;
+				quat1[0] = (rotation(2,1)-rotation(1,2))/S;
+				quat1[1] = (rotation(0,2)-rotation(2,0))/S;
+				quat1[2] = (rotation(1,0)-rotation(0,1))/S;
+				quat1[3] = S/4;
 			}
-			for ( int i = 0; i < 4; i ++ )
-				quat[i] = sqrt( quat[i] );
-			if ( quat[0] >= quat[1] && quat[0] >= quat[2] && quat[0] >= quat[3] ) {
-				quat[0] *= 1.0;
-				quat[1] *= (rotation(2,1)-rotation(1,2) > 0);
-				quat[2] *= (rotation(0,2)-rotation(2,0) > 0);
-				quat[3] *= (rotation(1,0)-rotation(0,1) > 0);
+			else if ( rotation(0,0) >= rotation(1,1) && rotation(0,0) >= rotation(2,2) ) {
+				double S = sqrt(1.0+rotation(0,0)-rotation(1,1)-rotation(2,2))*2;
+				quat1[0] = S/4;
+				quat1[1] = (rotation(0,1)+rotation(1,0))/S;
+				quat1[2] = (rotation(0,2)+rotation(2,0))/S;
+				quat1[3] = (rotation(2,1)-rotation(1,2))/S;
 			}
-			else if ( quat[1] >= quat[0] && quat[1] >= quat[2] && quat[1] >= quat[3] ) {
-				quat[0] *= (rotation(2,1)-rotation(1,2) > 0);
-				quat[1] *= 1.0;
-				quat[2] *= (rotation(1,0)+rotation(0,1) > 0);
-				quat[3] *= (rotation(0,2)+rotation(2,0) > 0);
+			else if ( rotation(1,1) >= rotation(2,2) ) {
+				double S = sqrt(1.0+rotation(1,1)-rotation(0,0)-rotation(2,2))*2;
+				quat1[0] = (rotation(0,1)+rotation(1,0))/S;
+				quat1[1] = S/4;
+				quat1[2] = (rotation(1,2)+rotation(2,1))/S;
+				quat1[3] = (rotation(0,2)-rotation(2,0))/S;
 			}
-			else if ( quat[2] >= quat[0] && quat[2] >= quat[1] && quat[2] >= quat[3] ) {
-				quat[0] *= (rotation(0,2)-rotation(2,0) > 0);
-				quat[1] *= (rotation(1,0)+rotation(0,1) > 0);
-				quat[2] *= 1.0;
-				quat[3] *= (rotation(2,1)+rotation(1,2) > 0);
+			else {
+				double S = sqrt(1.0+rotation(2,2)-rotation(0,0)-rotation(1,1))*2;
+				quat1[0] = (rotation(0,2)+rotation(2,0))/S;
+				quat1[1] = (rotation(1,2)+rotation(2,1))/S;
+				quat1[2] = S/4;
+				quat1[3] = (rotation(1,0)-rotation(0,1))/S;
 			}
-			else if ( quat[3] >= quat[0] && quat[3] >= quat[1] && quat[3] >= quat[2] ) {
-				quat[0] *= (rotation(1,0)-rotation(0,1) > 0);
-				quat[1] *= (rotation(0,2)+rotation(2,0) > 0);
-				quat[2] *= (rotation(2,1)+rotation(1,2) > 0);
-				quat[3] *= 1.0; 
-			}
-			
-			double nQuat = 0.0;
-			for ( int i = 0; i < 4; i ++ )
-				nQuat += quat[i]*quat[i];
-			nQuat = sqrt(nQuat);
-			for ( int i = 0; i < 4; i ++ )
-				quat[i] /= nQuat;	
-			*/	
-			
+
 			double nQuat1 = 0.0;
-			for ( int i = 0; i < 4; i ++ )
+			for ( int i = 0; i < 4; i ++ ) {
 				nQuat1 += quat1[i]*quat1[i];
+			}
 			nQuat1 = sqrt(nQuat1);
-			for ( int i = 0; i < 4; i ++ )
-				quat1[i] /= nQuat1;	
+			for ( int i = 0; i < 4; i ++ ) {
+				quat1[i] /= nQuat1;
+			}
 			Pt<3> trans;
-				trans[0] = translation(0,0);
+			trans[0] = translation(0,0);
 			trans[1] = translation(1,0);
 			trans[2] = translation(2,0);
 			pose.translation = trans;
 			pose.rotation = quat1;
 			return true;
-			//cout << pose.rotation << " " << pose.translation;
-			//getchar();
-			/*
-			double phi, theta, psi;
-			phi 	= 2*( pose.rotation[3]*pose.rotation[0] + pose.rotation[1]*pose.rotation[2] )
-					  /( 1-2*(pow(pose.rotation[0], 2)+pow(pose.rotation[1], 2)) );
-			theta 	= 2*( pose.rotation[3]*pose.rotation[1]-pose.rotation[2]*pose.rotation[0] );
-			psi 	= 2*( pose.rotation[3]*pose.rotation[2] + pose.rotation[0]*pose.rotation[1] )
-					  /( 1-2*(pow(pose.rotation[1], 2)+pow(pose.rotation[2], 2)) );		
-			phi = atan( phi ) * 180/PI;
-			theta = asin( theta ) * 180/PI;
-			psi = atan( psi ) * 180/PI;
-			cout << "Pose Eular angle: " << phi << ", " << theta << ", " << psi << endl;	
-			*/
 		}
+		
+		void OutputMatch( vector<Match3DData *> data ) {
+			for ( int i = 0; i < data.size(); i ++ ) 
+				cout << data[i]->obser3d << " " << data[i]->model3d << endl;
+//			getchar();
+		}
+		
 		
 		bool RANSAC( Pose &pose, const vector<Match3DData *> &cluster ) {
 			vector<Match3DData *> samples;
@@ -302,24 +283,17 @@ namespace MopedNS {
 				if( !randSample( samples, cluster, NPtsAlign ) ) 
 					return false;
 				if ( DistSample( samples ) ) {
-//					cout << "Pose estimation ....\n";
 					initPose( pose, samples );
-//					bool PlanarFlag = PlanarSamples( samples );
 					bool PlanarFlag = false;
-					/*
-					PoseDepth( samples, PlanarFlag, pose );
-					vector<Match3DData *> consistent;
-					testAllPoints( consistent, pose, cluster, ErrorThreshold );
-					if ( (int)consistent.size() > MinNPtsObject ) {
-						PoseDepth( consistent, PlanarFlag, pose );					
+					/*					
+					if (PoseDepth( samples, PlanarFlag, pose ))
 						return true;
-					}
 					*/
-					if ( PoseDepth( samples, PlanarFlag, pose ) ) {
+					if ( PoseDepth( samples, pose ) ) {
 						vector<Match3DData *> consistent;
 						testAllPoints( consistent, pose, cluster, ErrorThreshold );
 						if ( (int)consistent.size() > MinNPtsObject ) {
-							PoseDepth( consistent, PlanarFlag, pose );					
+							PoseDepth( consistent, pose );					
 							return true;
 						}						
 					}
@@ -390,17 +364,9 @@ namespace MopedNS {
 			vector< SP_Image > &images = frameData.images;
 			vector< SP_DepthImage > &depthImages = frameData.depthImages ;
 			vector< vector< FrameData::Match > > &matches = frameData.matches;
-/*
-			for ( int i = 0; i < (int)matches.size(); i ++ ) {
-				for ( int j = 0; j < (int)matches[i].size(); j ++ ) {
-					cout << matches[i][j].cloud3D << " " << matches[i][j].coord3D << " " << matches[i][j].coord2D << endl;
-				}
-			}
-			*/
 			vector< vector< FrameData::Cluster > > &clusters = frameData.clusters;
 			vector< vector< Match3DData > > matchData;
 			preprocessAllMatches( matchData, matches, images );
-			
 			vector< pair<int,int> > tasks;
 			tasks.reserve(1000);
 			int model;
@@ -410,26 +376,18 @@ namespace MopedNS {
 						tasks.push_back( make_pair(model, cluster) );
 			}
 
-			//#pragma omp parallel for
+			#pragma omp parallel for
 			for(int task = 0; task < (int)tasks.size(); task ++) {
 				int model = tasks[task].first;
 				int cluster = tasks[task].second;
 				vector<Match3DData *> cl;
-				foreach( point, clusters[model][cluster] )
+				foreach( point, clusters[model][cluster] ) 
 					cl.push_back( & matchData[model][point] );
-				outputcl(cl);
+//				OutputMatch(cl);
+//				outputcl(cl);
 				Pose pose;
 				bool found = RANSAC( pose, cl );
-				/* if found is false, no consistent object is found in the cluster
-				 * However, cl is used instead of original cluster data,
-				 * cluster store the index for match in each frameData and each object
-				 * specificly
-				 * The detail about how to add the object to the frameData.objects:
-				 * 		It seems it didn't follow the found (true or false), the
-				 * 		default threads set which is 4, the number of push_back
-				 * 		  */
 				if ( found > 0 ) {
-					cout << "found one object ...\n";
 					#pragma omp critical(POSE)
 					{
 						SP_Object obj(new Object);

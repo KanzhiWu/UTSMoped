@@ -152,38 +152,38 @@ namespace MopedNS {
 				 * if the ratio is large, it seems more matches will be detected
 				 * if the ratio is small, few matches will be detected */
 				if(  ds[0]/ds[1] < Ratio ) {
-					/* nModel1 may output the category of objects
-					 * nModel1 seems range from 0 to model.size() - 1
-					 * Matches is resized as the model.size() and
-					 * store the matches in frameData */
-					int nModel1 = correspModel[nx[0]];
-					if( matches[nModel1].capacity() < 1000 )
-						matches[nModel1].reserve(1000);
-					matches[nModel1].resize( matches[nModel1].size() +1 );
-					int objFeatIdx;
-	
-					objFeatIdx = nx[0] - stepIdx[nModel1];
-
-					FrameData::Match &match = matches[nModel1].back();
-					match.imageIdx = corresp[i].imageIdx;
-					match.coord3D = *correspFeat[nx[0]];
-					match.coord2D = corresp[i].coord2D;
-					match.cloud3D = corresp[i].cloud3D;
-					match.featIdx = objFeatIdx;
-					/*
 					cv::Point pt;
 					pt.x = corresp[i].coord2D[0];
 					pt.y = corresp[i].coord2D[1];
-					if ( pt.x > centerx - 25 && pt.x < centerx + 25 && pt.y > centery - 80 && pt.y < centery - 30 ) {
-						cv::circle( cvImage, pt, 5, cv::Scalar::all(0), 2 );
-						cout << match.cloud3D << " " << match.coord3D << endl;					
-					}
-					*/ 
+//					if ( pt.x > centerx - 40 && pt.x < centerx + 40 && pt.y > centery - 40 && pt.y < centery + 40 ) {
+						int nModel1 = correspModel[nx[0]];
+						if( matches[nModel1].capacity() < 1000 )
+							matches[nModel1].reserve(1000);
+						matches[nModel1].resize( matches[nModel1].size() +1 );
+						int objFeatIdx;
+		
+						objFeatIdx = nx[0] - stepIdx[nModel1];						
+						FrameData::Match &match = matches[nModel1].back();
+						match.imageIdx = corresp[i].imageIdx;
+						match.coord3D = *correspFeat[nx[0]];
+						match.coord2D = corresp[i].coord2D;
+
+						Pt<3> tmp;
+						tmp[2] = corresp[i].cloud3D[2];
+						tmp[0] = tmp[2]*(match.coord2D[0]-317.81)/543.22;
+						tmp[1] = tmp[2]*(match.coord2D[1]-265.91)/543.31;
+						match.cloud3D = tmp;
+						match.featIdx = objFeatIdx;	
+
+
+//						cv::circle( cvImage, pt, 5, cv::Scalar::all(0), 2 );
+//						cout << match.cloud3D << " " << match.coord3D << " " << tmp << endl;														
+//					}	
+							
 				}
 			}
-			//cv::imshow( "match", cvImage );
-			//cv::waitKey( 10 );
-
+//			cv::imshow( "match", cvImage );
+//			cv::waitKey( 10 );
 		}
 	};
 };

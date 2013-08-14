@@ -52,3 +52,4 @@ function angle = Matrix2Eular(R)
     angle(1,3) = psi*180/pi;
     angle
 end
+
