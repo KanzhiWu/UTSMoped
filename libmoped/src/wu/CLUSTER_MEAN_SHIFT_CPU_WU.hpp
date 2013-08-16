@@ -140,18 +140,7 @@ namespace MopedNS {
 					MeanShift( frameData.clusters[model], pointsPerImage[i], Radius, Merge, MinPts, MaxIterations );
 				}
 			}
-			/*
-			#pragma omp parallel for
-			for( int model = 0; model < (int)frameData.matches.size(); model ++) {
-				vector< vector< pair<Pt<3>, int> > > pointsPerImage( frameData.images.size() ) ;
-				for( int match = 0; match < (int)frameData.matches[model].size(); match ++) {
-					pointsPerImage[frameData.matches[model][match].imageIdx].push_back( make_pair( frameData.matches[model][match].cloud3D, match ) );
-				}
-				for( int i=0; i<(int)frameData.images.size(); i++ ) {
-					MeanShift( frameData.clusters[model], pointsPerImage[i], Radius, Merge, MinPts, MaxIterations );
-				}
-			}			
-			*/
+
 			if( _stepName == "CLUSTER" ) 
 				frameData.oldClusters = frameData.clusters;
 		}

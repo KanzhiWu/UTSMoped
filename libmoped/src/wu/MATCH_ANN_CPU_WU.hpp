@@ -42,46 +42,31 @@ namespace MopedNS {
 			skipCalculation = true;
 
 			unsigned int modelsNFeats = 0;
-/* The features and descriptors are all added together for matching
- * seen from the += step in foreach() */
 			foreach( model, *models )
 				modelsNFeats += model->IPs[DescriptorType].size();
 
 			correspModel.resize( modelsNFeats );
 			correspFeat.resize( modelsNFeats );
-/* from the input parameters, DescriptorSize is likely to be 128 */
 			ANNpointArray refPts = annAllocPts( modelsNFeats , DescriptorSize );
 
 			int x=0;
 			stepIdx.push_back(x);
-/* Iteration for each models */
 			for( int nModel = 0; nModel < (int)models->size(); nModel++ ) {
-
 				vector<Model::IP> &IPs = (*models)[nModel]->IPs[DescriptorType];
-/* Iteration for number of features for each model */
 				for( int nFeat = 0; nFeat < (int)IPs.size(); nFeat++ ) {
-
 					correspModel[x] = nModel;
 					if ( x > 1 && correspModel[x-1] != correspModel[x]  ) {
 						stepIdx.push_back(x);
 					}
 					correspFeat[x]  = &IPs[nFeat].coord3D;
 					norm( IPs[nFeat].descriptor );
-/* Iteration for push descriptors to each IPs */
 					for( int i=0; i<DescriptorSize; i++ )
 						refPts[x][i] = IPs[nFeat].descriptor[i];
-
 					x++;
 				}
-			}
-
-			
+			}		
 			
 			if( modelsNFeats > 1 ) {
-/* Once we have recorded the model feature information
- * skipCalculation is set to be false and
- * we don't have to load this information again in future iteration
- * ABOVE need to be VERIFIED */
 				skipCalculation = false;
 				if( kdtree )
 					delete kdtree;

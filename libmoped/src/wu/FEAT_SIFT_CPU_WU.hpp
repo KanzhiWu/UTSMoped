@@ -88,6 +88,7 @@ namespace MopedNS {
 //							pt.x = key->col;
 //							pt.y = key->row;
 //							cv::circle( cvImage, pt, 5, cv::Scalar::all(0), 2 );
+
 							detectedFeatures.back().cloud3D[0] = cloud->points[m*cloud->width+n].x*100;
 							detectedFeatures.back().cloud3D[1] = cloud->points[m*cloud->width+n].y*100;
 							detectedFeatures.back().cloud3D[2] = cloud->points[m*cloud->width+n].z*100;
