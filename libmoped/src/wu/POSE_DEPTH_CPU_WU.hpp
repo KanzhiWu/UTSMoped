@@ -24,6 +24,7 @@ namespace MopedNS {
 			Image *image;
 			Pt<3> model3d;
 			Pt<3> obser3d;
+			Pt<2> image2d;
 		};
 
 		bool randSample( vector<Match3DData *> &samples, const vector<Match3DData *> &cluster, unsigned int nSamples) {
@@ -154,10 +155,6 @@ namespace MopedNS {
 		}		
 		
 		bool PoseDepth( vector<Match3DData *> samples, Pose &pose ) {
-//			cout << "The number of samples is " << samples.size() << endl;
-//			for ( int i = 0; i < samples.size(); i++ ) {
-//				cout << samples[i]->obser3d << " " << samples[i]->model3d << endl;
-//			}
 			int ptNum = samples.size();
 			Eigen::MatrixXd matModel(ptNum, 3), matObser(ptNum, 3);	
 			Match2Matrix( samples, matModel, matObser );
@@ -184,15 +181,13 @@ namespace MopedNS {
 				Eigen::Matrix3d product;
 				product = vecModel * vecObser;
 				sumProduct = sumProduct + product;	
-
-								
 			}
 			Eigen::JacobiSVD<Eigen::MatrixXd> svd(sumProduct, Eigen::ComputeThinU | Eigen::ComputeThinV);
 			svdu = svd.matrixU();
 			svdv = svd.matrixV();
 			Eigen::MatrixXd tmp = svdv*(svdu.transpose());
 			double det = tmp.determinant();
-			if ( abs(det-1)<0.1 ) {
+			if ( abs(det-1) < 0.1 ) {
 				rotation = svdv * (svdu.transpose());
 			}
 			else {
@@ -220,59 +215,148 @@ namespace MopedNS {
 	//		cout << "\nRotation: \n" << rotation << "\nTranslation: \n" << translation << "\n";
 
 			// rotation matrix to quaternion
-			Pt<4> quat1;
+			Pt<4> quat;
 
 			double tr = rotation(0,0)+rotation(1,1)+rotation(2,2);
 			if ( tr > 0 ) {
 				double S = sqrt(tr+1.0)*2;
-				quat1[0] = (rotation(2,1)-rotation(1,2))/S;
-				quat1[1] = (rotation(0,2)-rotation(2,0))/S;
-				quat1[2] = (rotation(1,0)-rotation(0,1))/S;
-				quat1[3] = S/4;
+				quat[0] = (rotation(2,1)-rotation(1,2))/S;
+				quat[1] = (rotation(0,2)-rotation(2,0))/S;
+				quat[2] = (rotation(1,0)-rotation(0,1))/S;
+				quat[3] = S/4;
 			}
 			else if ( rotation(0,0) >= rotation(1,1) && rotation(0,0) >= rotation(2,2) ) {
 				double S = sqrt(1.0+rotation(0,0)-rotation(1,1)-rotation(2,2))*2;
-				quat1[0] = S/4;
-				quat1[1] = (rotation(0,1)+rotation(1,0))/S;
-				quat1[2] = (rotation(0,2)+rotation(2,0))/S;
-				quat1[3] = (rotation(2,1)-rotation(1,2))/S;
+				quat[0] = S/4;
+				quat[1] = (rotation(0,1)+rotation(1,0))/S;
+				quat[2] = (rotation(0,2)+rotation(2,0))/S;
+				quat[3] = (rotation(2,1)-rotation(1,2))/S;
 			}
 			else if ( rotation(1,1) >= rotation(2,2) ) {
 				double S = sqrt(1.0+rotation(1,1)-rotation(0,0)-rotation(2,2))*2;
-				quat1[0] = (rotation(0,1)+rotation(1,0))/S;
-				quat1[1] = S/4;
-				quat1[2] = (rotation(1,2)+rotation(2,1))/S;
-				quat1[3] = (rotation(0,2)-rotation(2,0))/S;
+				quat[0] = (rotation(0,1)+rotation(1,0))/S;
+				quat[1] = S/4;
+				quat[2] = (rotation(1,2)+rotation(2,1))/S;
+				quat[3] = (rotation(0,2)-rotation(2,0))/S;
 			}
 			else {
 				double S = sqrt(1.0+rotation(2,2)-rotation(0,0)-rotation(1,1))*2;
-				quat1[0] = (rotation(0,2)+rotation(2,0))/S;
-				quat1[1] = (rotation(1,2)+rotation(2,1))/S;
-				quat1[2] = S/4;
-				quat1[3] = (rotation(1,0)-rotation(0,1))/S;
+				quat[0] = (rotation(0,2)+rotation(2,0))/S;
+				quat[1] = (rotation(1,2)+rotation(2,1))/S;
+				quat[2] = S/4;
+				quat[3] = (rotation(1,0)-rotation(0,1))/S;
 			}
 
-			double nQuat1 = 0.0;
+			double nQuat = 0.0;
 			for ( int i = 0; i < 4; i ++ ) {
-				nQuat1 += quat1[i]*quat1[i];
+				nQuat += quat[i]*quat[i];
 			}
-			nQuat1 = sqrt(nQuat1);
+			nQuat = sqrt(nQuat);
 			for ( int i = 0; i < 4; i ++ ) {
-				quat1[i] /= nQuat1;
+				quat[i] /= nQuat;
 			}
 			Pt<3> trans;
 			trans[0] = translation(0,0);
 			trans[1] = translation(1,0);
 			trans[2] = translation(2,0);
 			pose.translation = trans;
-			pose.rotation = quat1;
+			pose.rotation = quat;
 			return true;
 		}
 		
 		void OutputMatch( vector<Match3DData *> data ) {
 			for ( int i = 0; i < data.size(); i ++ ) 
 				cout << data[i]->obser3d << " " << data[i]->model3d << endl;
-//			getchar();
+			getchar();
+		}
+		
+		void VisualizeMatch( vector<Match3DData *> data ) {
+			int ptNum = data.size();
+			Eigen::MatrixXd matModel(ptNum, 3), matObser(ptNum, 3);	
+			Match2Matrix( data, matModel, matObser );
+			Eigen::Vector3d aveModel, aveObser;
+			AveMatrix( matModel, aveModel );
+			AveMatrix( matObser, aveObser );
+			MatrixNormalize( matModel ); MatrixNormalize( matObser );			
+			int dataNum = data.size();
+			pcl::PointCloud<pcl::PointXYZRGB> cloud;
+			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudPtr;
+			cloud.width = dataNum*2;
+			cloud.height = 1;
+			cloud.is_dense = false;
+			cloud.points.resize( dataNum*2 );
+			// define 2 colors
+			uint8_t rmdl(255), gmdl(0), bmdl(0);
+			uint32_t colorMdl = ( static_cast<uint32_t>(rmdl) << 16 |
+			                      static_cast<uint32_t>(gmdl) << 8  |
+			                      static_cast<uint32_t>(bmdl) );
+			uint8_t robs(0), gobs(255), bobs(0);
+			uint32_t colorObs = ( static_cast<uint32_t>(robs) << 16 |
+								  static_cast<uint32_t>(gobs) << 8  |
+								  static_cast<uint32_t>(bobs));
+			// assign value to each point
+			for ( int i = 0; i < data.size(); i ++ ) {
+				cloud.points[2*i].x = matObser(i, 0);
+				cloud.points[2*i].y = matObser(i, 1);
+				cloud.points[2*i].z = matObser(i, 2);
+				cloud.points[2*i].rgb = *reinterpret_cast<float*>(&colorMdl);
+				
+				cloud.points[2*i+1].x = matModel(i, 0);
+				cloud.points[2*i+1].y = matModel(i, 1);
+				cloud.points[2*i+1].z = matModel(i, 2);
+				cloud.points[2*i+1].rgb = *reinterpret_cast<float*>(&colorObs);
+			}
+			
+			cloudPtr.reset( new pcl::PointCloud<pcl::PointXYZRGB>(cloud) );
+			boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer( new pcl:: visualization::PCLVisualizer("matched_point") );
+			viewer->setBackgroundColor(255, 255, 255);
+			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(cloudPtr);
+			viewer->addPointCloud<pcl::PointXYZRGB>(cloudPtr, rgb, "matched_point");
+			viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "matched_point");
+			viewer->addCoordinateSystem(2.0);
+			viewer->setCameraPosition(0.0, 0.0, -50.0, 0.0, 0.0, 0.0);
+			while (!viewer->wasStopped ()) {
+				viewer->spinOnce(100);
+				boost::this_thread::sleep(boost::posix_time::microseconds (1000000));
+			}			
+		}
+		
+		void VisualizeReproMatch( vector<Match3DData *> data, Pose pose ) {
+			Image *img = data[0]->image;
+			cv::Mat cvImage( img->height, img->width, CV_8UC1 );
+			for (int y = 0; y < img->height; y++) 
+				for (int x = 0; x < img->width; x++) 
+					cvImage.at<uchar>(y, x) = (float)img->data[img->width*y+x];			
+			
+			
+			int dataNum = data.size();
+			vector<Pt<3> > obserPts, modelPts;
+			vector<Pt<2> > imagePts;
+			vector<Pt<3> > nobserPts;
+			imagePts.resize( dataNum );
+			nobserPts.resize( dataNum );
+			obserPts.resize( dataNum );
+			modelPts.resize( dataNum );
+			for ( int i = 0; i < dataNum; i ++ ) {
+				for ( int j = 0; j < 3; j ++ ) {
+					obserPts[i][j] = data[i]->obser3d[j];
+					modelPts[i][j] = data[i]->model3d[j];
+				}
+			}
+			for ( int i = 0; i < dataNum; i ++ ) {
+				for ( int j = 0; j < 2; j ++ ) {
+					imagePts[i][j] = data[i]->image2d[j];
+					
+				}					
+				cv::Point pt;
+				pt.x = imagePts[i][0];
+				pt.y = imagePts[i][1];
+				cv::circle( cvImage, pt, 5, cv::Scalar::all(0), 2 );
+			}
+			
+			cv::imshow( "image", cvImage );
+			cv::waitKey(10);
+			
 		}
 		
 		
@@ -284,7 +368,6 @@ namespace MopedNS {
 					return false;
 				if ( DistSample( samples ) ) {
 					initPose( pose, samples );
-					bool PlanarFlag = false;
 					/*					
 					if (PoseDepth( samples, PlanarFlag, pose ))
 						return true;
@@ -293,7 +376,11 @@ namespace MopedNS {
 						vector<Match3DData *> consistent;
 						testAllPoints( consistent, pose, cluster, ErrorThreshold );
 						if ( (int)consistent.size() > MinNPtsObject ) {
-							PoseDepth( consistent, pose );					
+							cout << "...\n";
+							//OutputMatch( consistent );
+//							VisualizeMatch( consistent );
+							PoseDepth( consistent, pose );
+							VisualizeReproMatch( consistent, pose );					
 							return true;
 						}						
 					}
@@ -322,6 +409,7 @@ namespace MopedNS {
 
 				optData[model][match].model3d = matches[model][match].coord3D;
 				optData[model][match].obser3d = matches[model][match].cloud3D;
+				optData[model][match].image2d = matches[model][match].coord2D;
 				optData[model][match].image = image.get();				
 			}
 		}
@@ -376,7 +464,7 @@ namespace MopedNS {
 						tasks.push_back( make_pair(model, cluster) );
 			}
 
-			#pragma omp parallel for
+			//#pragma omp parallel for
 			for(int task = 0; task < (int)tasks.size(); task ++) {
 				int model = tasks[task].first;
 				int cluster = tasks[task].second;
