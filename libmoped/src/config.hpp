@@ -58,7 +58,7 @@ namespace MopedNS {
 //		pipeline.addAlg( "CLUSTER_DISPLAY", new CLUSTER_DISPLAY(3) );
 //		pipeline.addAlg( "LONGUET_HIGGINS", new LONGUET_HIGGINS_WU(8) );
 		pipeline.addAlg( "POSE", new POSE_DEPTH_CPU_WU( 500, 1, 4, 50, 3 ) );
-		pipeline.addAlg( "POSE_DISPLAY", new POSE_DISPLAY(3) );
+//		pipeline.addAlg( "POSE_DISPLAY", new POSE_DISPLAY(3) );
 //		pipeline.addAlg( "STATUS_DISPLAY", new STATUS_DISPLAY( DEFAULT_DISPLAY_LEVEL ) );
 //		pipeline.addAlg( "GLOBAL_DISPLAY", new GLOBAL_DISPLAY( 2 ) );
 /*					

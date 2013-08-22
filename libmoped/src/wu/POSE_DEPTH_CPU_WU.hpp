@@ -8,7 +8,7 @@
 #pragma once
 #include <Eigen/Dense>
 #include <Eigen/SVD>
-
+#include <algorithm>
 
 namespace MopedNS {
 
@@ -25,7 +25,28 @@ namespace MopedNS {
 			Pt<3> model3d;
 			Pt<3> obser3d;
 			Pt<2> image2d;
+			double dist;
+			bool operator < (const Match3DData& match) const {
+				return dist > match.dist;
+			}
 		};
+		
+		bool cmp( const Match3DData &match1, const Match3DData &match2 ) {
+			if ( match1.dist > match2.dist )
+				return true;
+			else
+				return false;
+		}	
+			
+		struct CompareMatch3DData {
+			bool operator() (Match3DData *lhs, Match3DData *rhs) { 
+				if ( lhs->dist > rhs->dist )
+					return true;
+				else
+					return false;
+			}
+		};
+ 
 
 		bool randSample( vector<Match3DData *> &samples, const vector<Match3DData *> &cluster, unsigned int nSamples) {
 			map<pair<Image *, Pt<3> >, int> used;
@@ -66,7 +87,7 @@ namespace MopedNS {
 					double dist = sqrt(	(pt1[0]-pt2[0])*(pt1[0]-pt2[0]) +
 											(pt1[1]-pt2[1])*(pt1[1]-pt2[1]) +
 											(pt1[2]-pt2[2])*(pt1[2]-pt2[2]) );
-					if ( dist < 0.5 )
+					if ( dist > 0.5 )
 						return true;
 				}
 			}
@@ -326,8 +347,7 @@ namespace MopedNS {
 			cv::Mat cvImage( img->height, img->width, CV_8UC1 );
 			for (int y = 0; y < img->height; y++) 
 				for (int x = 0; x < img->width; x++) 
-					cvImage.at<uchar>(y, x) = (float)img->data[img->width*y+x];			
-			
+					cvImage.at<uchar>(y, x) = (float)img->data[img->width*y+x];				
 			
 			int dataNum = data.size();
 			vector<Pt<3> > obserPts, modelPts;
@@ -357,6 +377,100 @@ namespace MopedNS {
 			cv::imshow( "image", cvImage );
 			cv::waitKey(10);
 			
+		}
+		
+		void VisualizeFeature2d( vector<Match3DData *> data ) {
+			int matchNum = data.size();
+			Image *img = data[0]->image;
+			cv::Mat cvImage( img->height, img->width, CV_8UC1 );
+			for (int y = 0; y < img->height; y++) 
+				for (int x = 0; x < img->width; x++) 
+					cvImage.at<uchar>(y, x) = (float)img->data[img->width*y+x];	
+			
+			for ( int i = 0; i < matchNum; i ++ ) {
+				cv::Point2f pt;
+				pt.x = data[i]->image2d[0];
+				pt.y = data[i]->image2d[1];
+				cv::circle( cvImage, pt, 5, cv::Scalar::all(0), 2 );				
+			}
+			cv::imshow( "features", cvImage );
+			cv::waitKey(100);		
+		}
+		
+		bool RelativeDistanceSamples( vector<Match3DData *> data ) {
+			int dataNum = data.size();
+			for ( int i = 0; i < dataNum; i ++ ) {
+				for ( int j = i+1; j < dataNum; j ++ ) {
+					Pt<3> pti = data[i]->obser3d;
+					Pt<3> ptj = data[j]->obser3d;
+					if ( pti.euclDist(ptj) < 3.0 )
+						return false;
+				}
+			}
+			return true;
+		}
+		
+		
+		
+		
+		bool OrderedRANSAC( Pose &pose, const vector<Match3DData *> &cluster ) {
+			// calculate the center of the cluster
+			Pt<2> clusterCenter;
+			clusterCenter.init( 0.0, 0.0 );
+			int matchNum = cluster.size();
+			for ( int i = 0; i < matchNum; i ++ ) {
+				clusterCenter[0] += cluster[i]->image2d[0];
+				clusterCenter[1] += cluster[i]->image2d[1];
+			}
+			clusterCenter[0] /= matchNum;
+			clusterCenter[1] /= matchNum;
+			cv::Point2f ptCenter;
+			ptCenter.x = clusterCenter[0];
+			ptCenter.y = clusterCenter[1];
+			
+			// rank the feature according to the distance to the center
+			vector<Match3DData> clusterClone;			
+			for ( int i = 0; i < matchNum; i ++ ) {
+				cluster[i]->dist = sqrt((cluster[i]->image2d[0]-clusterCenter[0])*(cluster[i]->image2d[0]-clusterCenter[0]) +
+										(cluster[i]->image2d[1]-clusterCenter[1])*(cluster[i]->image2d[1]-clusterCenter[1]));
+				clusterClone.push_back(*cluster[i]);
+			}
+			std::sort( clusterClone.begin(), clusterClone.end() );
+			
+			// SVD based pose estimation
+			Pose ePose;
+			// check the number of remain features
+			while ( clusterClone.size() > 20 ) {
+				// select top 4 features in clusterClone
+				vector<Match3DData *> samples;
+				for ( int i = 0; i < 6; i ++ )
+					samples.push_back( &clusterClone[i] );
+				// check the relative distance between samples
+				VisualizeFeature2d( samples );			
+				if ( RelativeDistanceSamples(samples) ) {
+					// pose estimation using SVD
+					initPose( ePose, samples );
+					PoseDepth( samples, ePose );
+					vector<Match3DData *> consistent;
+					testAllPoints( consistent, ePose, cluster, ErrorThreshold );
+					cout << "Consistent size: " << consistent.size() << endl;
+					cout << "Before erase: " << clusterClone.size() << endl;
+					clusterClone.erase(clusterClone.begin());
+					cout << "After erase: " << clusterClone.size() << endl;					
+				}
+				else {
+					cout << "Before erase: " << clusterClone.size() << endl;
+					// pop out the first element in clusterClone
+					clusterClone.erase(clusterClone.begin());
+					cout << "After erase: " << clusterClone.size() << endl;
+				}
+				getchar();				
+			}
+							
+			// generate the samples using ordered data
+			
+			
+			// pose estimation and check
 		}
 		
 		
@@ -474,7 +588,8 @@ namespace MopedNS {
 //				OutputMatch(cl);
 //				outputcl(cl);
 				Pose pose;
-				bool found = RANSAC( pose, cl );
+//				bool found = RANSAC( pose, cl );
+				bool found = OrderedRANSAC( pose, cl );
 				if ( found > 0 ) {
 					#pragma omp critical(POSE)
 					{
