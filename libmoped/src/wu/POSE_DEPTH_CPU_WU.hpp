@@ -31,23 +31,6 @@ namespace MopedNS {
 			}
 		};
 		
-		bool cmp( const Match3DData &match1, const Match3DData &match2 ) {
-			if ( match1.dist > match2.dist )
-				return true;
-			else
-				return false;
-		}	
-			
-		struct CompareMatch3DData {
-			bool operator() (Match3DData *lhs, Match3DData *rhs) { 
-				if ( lhs->dist > rhs->dist )
-					return true;
-				else
-					return false;
-			}
-		};
- 
-
 		bool randSample( vector<Match3DData *> &samples, const vector<Match3DData *> &cluster, unsigned int nSamples) {
 			map<pair<Image *, Pt<3> >, int> used;
 			deque<pair<Float, Match3DData *> > randomSamples;
@@ -386,15 +369,18 @@ namespace MopedNS {
 			for (int y = 0; y < img->height; y++) 
 				for (int x = 0; x < img->width; x++) 
 					cvImage.at<uchar>(y, x) = (float)img->data[img->width*y+x];	
-			
+		
 			for ( int i = 0; i < matchNum; i ++ ) {
+				cout << data[i]->image2d << " ";
 				cv::Point2f pt;
 				pt.x = data[i]->image2d[0];
 				pt.y = data[i]->image2d[1];
 				cv::circle( cvImage, pt, 5, cv::Scalar::all(0), 2 );				
 			}
 			cv::imshow( "features", cvImage );
-			cv::waitKey(100);		
+			cv::waitKey(0);	
+			cout << endl;
+		
 		}
 		
 		bool RelativeDistanceSamples( vector<Match3DData *> data ) {
@@ -403,18 +389,145 @@ namespace MopedNS {
 				for ( int j = i+1; j < dataNum; j ++ ) {
 					Pt<3> pti = data[i]->obser3d;
 					Pt<3> ptj = data[j]->obser3d;
-					if ( pti.euclDist(ptj) < 3.0 )
+					if ( pti.euclDist(ptj) < 2.0 )
 						return false;
 				}
 			}
 			return true;
 		}
 		
+		int MinVector( vector<double> data ) {
+			double min = INT_MAX;
+			int minidx;
+			for ( int i = 0; i < data.size(); i ++ ) {
+				if ( data[i] < min ) {
+					min = data[i];
+					minidx = i;
+				}
+			}
+			return minidx;
+		}
 		
+		void GetSeeds( vector<Pt<2> > image2ds, double &distance, vector<int> &seeds ) {
+			// set the seeds value
+			vector<int> idxs;
+			for ( int i = 0; i < image2ds.size(); i ++ )
+				idxs.push_back(i);
+			for ( int i = 0; i < 4; i ++ ) {
+				int idx = rand()%(idxs.size());
+				seeds.push_back(idxs[idx]);
+				idxs.erase(idxs.begin()+idx);
+			}
+			// just calculate the distance between seeds
+			double minDist = INT_MAX;
+			for ( int i = 0; i < seeds.size(); i ++ ) {
+				for ( int j = i+1; j < seeds.size(); j ++ ) {
+					double dist = image2ds[seeds[i]].euclDist( image2ds[seeds[j]] );
+					if ( dist < minDist )
+						minDist = dist;
+				}
+			}
+			distance = minDist;
+			
+			/*
+			// KMeans part
+			vector<vector<int> > cluster;
+			cluster.resize( 4 );
+			for ( int i = 0; i < 4; i ++ )
+				cluster[i].push_back(seeds[i]);
+			// assign other features using distance
+			for ( int i = 0; i < idxs.size(); i ++ ) {
+				// get the distance to 4 centers
+				vector<double> dists;
+				dists.resize( seeds.size() );
+				for ( int j = 0; j < seeds.size(); j ++ )
+					dists[j] = image2ds[idxs[i]].euclDist(image2ds[seeds[j]]);
+				int closeSeed = MinVector( dists );
+				cluster[closeSeed].push_back( idxs[i] );
+			}
+			*/	
+		}
+		
+		struct CmpSeedsDists {
+			bool operator()(const std::pair<double, vector<int> > &left, const std::pair<double, vector<int> > &right) {
+				return left.first > right.first;
+			}
+		};
+		
+		void OrderedRandomSample( vector<Match3DData *> &samples, vector<Match3DData> cluster, int nSamples) {
+			if ( nSamples == 4 ) {
+				for ( int i = 0; i < 4; i ++ )
+					samples.push_back( &cluster[i] );
+			}
+			else {
+				/*
+				Image *img = cluster[0].image;
+				cv::Mat cvImage( img->height, img->width, CV_8UC1 );
+				for (int y = 0; y < img->height; y++) 
+					for (int x = 0; x < img->width; x++) 
+						cvImage.at<uchar>(y, x) = (float)img->data[img->width*y+x];					
+				*/
+				
+				
+				// get the features from the cluster
+				vector<Pt<2> > image2ds;
+				vector<Match3DData *> subCluster;
+				for ( int i = 0; i < nSamples; i ++ ) {
+					image2ds.push_back( cluster[i].image2d );
+					subCluster.push_back( &cluster[i] );
+
+					/*
+					cv::Point2f pt;
+					pt.x = cluster[i].image2d[0];
+					pt.y = cluster[i].image2d[1];
+					cv::circle( cvImage, pt, 4, cv::Scalar::all(0), 2 );	
+					*/
+					
+				}
+				// k-means multiple times and select the cluster
+				// result which has the largest inter-cluster difference
+				// seeds maybe the same in the RANDOM selection
+				// *********************************************
+				// used check should be further implemented
+				int nKMeans = 20;
+				vector<pair<double, vector<int> > > seedDists;
+				for ( int i = 0; i < nKMeans; i ++ ) {
+					double distance;
+					vector<int> seeds;
+					GetSeeds( image2ds, distance, seeds );
+					seedDists.push_back(make_pair(distance, seeds));
+				}
+				std::sort( seedDists.begin(), seedDists.end(), CmpSeedsDists() );	
+				/*			
+				for ( int i = 0; i < nKMeans; i ++ ) {
+					cout << "seedDist: " << i << ": " << seedDists[i].first << ";  ";
+					for ( int j = 0; j < seedDists[i].second.size(); j ++ ) {
+						cout << seedDists[i].second[j] << " ";
+					}
+					cout << endl;
+				}
+				*/
+				for ( int i = 0; i < seedDists[0].second.size(); i ++ ) {
+					int idx = seedDists[0].second[i];
+					samples.push_back( subCluster[idx] );
+					/*
+					cv::Point2f pt;
+					pt.x = subCluster[idx]->image2d[0];
+					pt.y = subCluster[idx]->image2d[1];
+					cv::circle( cvImage, pt, 6, cv::Scalar::all(255), 2 );						
+					*/										
+				}
+				//cout << "\n*********************************************\n";
+//				cv::imshow( "features", cvImage );
+//				cv::waitKey(0);									
+			}
+			
+		}		
 		
 		
 		bool OrderedRANSAC( Pose &pose, const vector<Match3DData *> &cluster ) {
 			// calculate the center of the cluster
+			/*
 			Pt<2> clusterCenter;
 			clusterCenter.init( 0.0, 0.0 );
 			int matchNum = cluster.size();
@@ -436,38 +549,61 @@ namespace MopedNS {
 				clusterClone.push_back(*cluster[i]);
 			}
 			std::sort( clusterClone.begin(), clusterClone.end() );
+			*/
+			Pt<3> clusterCenter;
+			clusterCenter.init(0.0, 0.0, 0.0);
+			int matchNum = cluster.size();
+			for ( int i = 0; i < matchNum; i ++ ) {
+				for ( int j = 0; j < 3; j ++ )
+					clusterCenter[j] += cluster[i]->obser3d[j];
+			}
+			for ( int i = 0; i < 3; i ++ )
+				clusterCenter[i] /= matchNum;
+			vector<Match3DData> clusterClone;
+			for ( int i = 0; i < matchNum; i ++ ) {
+				cluster[i]->dist = sqrt( (cluster[i]->obser3d[0]-clusterCenter[0])*(cluster[i]->obser3d[0]-clusterCenter[0]) +
+										 (cluster[i]->obser3d[1]-clusterCenter[1])*(cluster[i]->obser3d[1]-clusterCenter[1]) +
+										 (cluster[i]->obser3d[2]-clusterCenter[2])*(cluster[i]->obser3d[2]-clusterCenter[2]));
+				clusterClone.push_back( *cluster[i] );
+			}
+			std::sort( clusterClone.begin(), clusterClone.end() );
 			
 			// SVD based pose estimation
 			Pose ePose;
 			// check the number of remain features
 			while ( clusterClone.size() > 20 ) {
-				// select top 4 features in clusterClone
+				// select top 4 features in clusterClone				
 				vector<Match3DData *> samples;
-				for ( int i = 0; i < 6; i ++ )
-					samples.push_back( &clusterClone[i] );
+				OrderedRandomSample( samples, clusterClone, 8 );
+				//cout << "sample size: " << samples.size() << endl;
+				//for ( int i = 0; i < 4; i ++ )
+				//	samples.push_back( &clusterClone[i] );
 				// check the relative distance between samples
-				VisualizeFeature2d( samples );			
+				//VisualizeFeature2d( samples );			
 				if ( RelativeDistanceSamples(samples) ) {
 					// pose estimation using SVD
 					initPose( ePose, samples );
 					PoseDepth( samples, ePose );
 					vector<Match3DData *> consistent;
 					testAllPoints( consistent, ePose, cluster, ErrorThreshold );
-					cout << "Consistent size: " << consistent.size() << endl;
-					cout << "Before erase: " << clusterClone.size() << endl;
+//					cout << "Consistent size: " << consistent.size() << endl;
+					if ( (int)consistent.size() > clusterClone.size()*0.5 ) {
+//						cout << "...\n";
+						PoseDepth( consistent, pose );
+						VisualizeReproMatch( consistent, pose );					
+						return true;
+					}	
 					clusterClone.erase(clusterClone.begin());
-					cout << "After erase: " << clusterClone.size() << endl;					
+					clusterClone.erase(clusterClone.begin());					
 				}
 				else {
-					cout << "Before erase: " << clusterClone.size() << endl;
-					// pop out the first element in clusterClone
+					// pop out the first 2 elements in clusterClone
 					clusterClone.erase(clusterClone.begin());
-					cout << "After erase: " << clusterClone.size() << endl;
+					clusterClone.erase(clusterClone.begin());					
 				}
-				getchar();				
+//				getchar();				
 			}
 							
-			// generate the samples using ordered data
 			
 			
 			// pose estimation and check
