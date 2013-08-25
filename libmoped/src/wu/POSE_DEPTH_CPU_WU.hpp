@@ -1,10 +1,3 @@
-/*
- * DEPTH_VERIFICATION.hpp
- *
- *  Created on: Jul 30, 2013
- *      Author: wu
- */
- 
 #pragma once
 #include <Eigen/Dense>
 #include <Eigen/SVD>
@@ -460,30 +453,81 @@ namespace MopedNS {
 					samples.push_back( &cluster[i] );
 			}
 			else {
-				/*
+				
 				Image *img = cluster[0].image;
 				cv::Mat cvImage( img->height, img->width, CV_8UC1 );
 				for (int y = 0; y < img->height; y++) 
 					for (int x = 0; x < img->width; x++) 
 						cvImage.at<uchar>(y, x) = (float)img->data[img->width*y+x];					
-				*/
-				
-				
 				// get the features from the cluster
 				vector<Pt<2> > image2ds;
 				vector<Match3DData *> subCluster;
 				for ( int i = 0; i < nSamples; i ++ ) {
 					image2ds.push_back( cluster[i].image2d );
 					subCluster.push_back( &cluster[i] );
-
-					/*
 					cv::Point2f pt;
 					pt.x = cluster[i].image2d[0];
 					pt.y = cluster[i].image2d[1];
-					cv::circle( cvImage, pt, 4, cv::Scalar::all(0), 2 );	
-					*/
-					
+					cv::circle( cvImage, pt, 4, cv::Scalar::all(0), 2 );					
 				}
+				// get the relative distance matrix
+				vector<int> distSeeds;
+				int seed1, seed2;
+				double maxdist = 0.0;
+				Eigen::MatrixXd distsMat( nSamples, nSamples );
+				for ( int i = 0; i < subCluster.size(); i ++ ) {
+					for ( int j = i; j < subCluster.size(); j ++ ) {
+						if ( j == i )
+							distsMat(i, j) = 0.0;
+						else {
+							double dist = subCluster[i]->obser3d.euclDist( subCluster[j]->obser3d );
+							distsMat(i, j) = dist;
+							distsMat(j, i) = dist;
+							if ( dist > maxdist ) {
+								maxdist = dist;
+								seed1 = i;
+								seed2 = j;
+							}
+						}
+					}
+				}
+				maxdist = 0.0;
+				int seed3;
+				distSeeds.push_back( seed1 );
+				distSeeds.push_back( seed2 );
+				for ( int i = 0; i < subCluster.size(); i ++ ) {
+					if ( i != seed1 && i != seed2 ) {
+						double dist = distsMat(i, seed1) + distsMat(i, seed2);
+						if ( dist > maxdist ) {
+							seed3 = i;
+							maxdist = dist;
+						}
+					}
+				}
+				distSeeds.push_back(seed3);
+				int seed4;
+				maxdist = 0.0;
+				for ( int i = 0; i < subCluster.size(); i ++ ) {
+					if ( i != seed1 && i != seed2 && i != seed3 ) {
+						double dist = distsMat(i, seed1) +
+						               distsMat(i, seed2) + 
+						               distsMat(i, seed3);
+						if ( dist > maxdist ) {
+							seed4 = i;
+							maxdist = dist;
+						}
+ 					}
+				}
+				distSeeds.push_back(seed4);
+				for ( int i = 0; i < distSeeds.size(); i ++ ) {
+					int idx = distSeeds[i];
+					samples.push_back(subCluster[idx]);
+					cv::Point2f pt;
+					pt.x = subCluster[idx]->image2d[0];
+					pt.y = subCluster[idx]->image2d[1];
+					cv::circle( cvImage, pt, 6, cv::Scalar::all(255), 2 );							
+				}
+				/*
 				// k-means multiple times and select the cluster
 				// result which has the largest inter-cluster difference
 				// seeds maybe the same in the RANDOM selection
@@ -498,58 +542,32 @@ namespace MopedNS {
 					seedDists.push_back(make_pair(distance, seeds));
 				}
 				std::sort( seedDists.begin(), seedDists.end(), CmpSeedsDists() );	
-				/*			
-				for ( int i = 0; i < nKMeans; i ++ ) {
-					cout << "seedDist: " << i << ": " << seedDists[i].first << ";  ";
-					for ( int j = 0; j < seedDists[i].second.size(); j ++ ) {
-						cout << seedDists[i].second[j] << " ";
-					}
-					cout << endl;
-				}
-				*/
+
 				for ( int i = 0; i < seedDists[0].second.size(); i ++ ) {
 					int idx = seedDists[0].second[i];
 					samples.push_back( subCluster[idx] );
-					/*
+					
 					cv::Point2f pt;
 					pt.x = subCluster[idx]->image2d[0];
 					pt.y = subCluster[idx]->image2d[1];
 					cv::circle( cvImage, pt, 6, cv::Scalar::all(255), 2 );						
-					*/										
+															
 				}
+				*/
 				//cout << "\n*********************************************\n";
-//				cv::imshow( "features", cvImage );
-//				cv::waitKey(0);									
-			}
-			
+				cv::imshow( "features", cvImage );
+				cv::waitKey(10);									
+			}			
 		}		
+		
+		
+
+
+		
 		
 		
 		bool OrderedRANSAC( Pose &pose, const vector<Match3DData *> &cluster ) {
 			// calculate the center of the cluster
-			/*
-			Pt<2> clusterCenter;
-			clusterCenter.init( 0.0, 0.0 );
-			int matchNum = cluster.size();
-			for ( int i = 0; i < matchNum; i ++ ) {
-				clusterCenter[0] += cluster[i]->image2d[0];
-				clusterCenter[1] += cluster[i]->image2d[1];
-			}
-			clusterCenter[0] /= matchNum;
-			clusterCenter[1] /= matchNum;
-			cv::Point2f ptCenter;
-			ptCenter.x = clusterCenter[0];
-			ptCenter.y = clusterCenter[1];
-			
-			// rank the feature according to the distance to the center
-			vector<Match3DData> clusterClone;			
-			for ( int i = 0; i < matchNum; i ++ ) {
-				cluster[i]->dist = sqrt((cluster[i]->image2d[0]-clusterCenter[0])*(cluster[i]->image2d[0]-clusterCenter[0]) +
-										(cluster[i]->image2d[1]-clusterCenter[1])*(cluster[i]->image2d[1]-clusterCenter[1]));
-				clusterClone.push_back(*cluster[i]);
-			}
-			std::sort( clusterClone.begin(), clusterClone.end() );
-			*/
 			Pt<3> clusterCenter;
 			clusterCenter.init(0.0, 0.0, 0.0);
 			int matchNum = cluster.size();
@@ -575,20 +593,13 @@ namespace MopedNS {
 				// select top 4 features in clusterClone				
 				vector<Match3DData *> samples;
 				OrderedRandomSample( samples, clusterClone, 8 );
-				//cout << "sample size: " << samples.size() << endl;
-				//for ( int i = 0; i < 4; i ++ )
-				//	samples.push_back( &clusterClone[i] );
-				// check the relative distance between samples
-				//VisualizeFeature2d( samples );			
 				if ( RelativeDistanceSamples(samples) ) {
 					// pose estimation using SVD
 					initPose( ePose, samples );
 					PoseDepth( samples, ePose );
 					vector<Match3DData *> consistent;
 					testAllPoints( consistent, ePose, cluster, ErrorThreshold );
-//					cout << "Consistent size: " << consistent.size() << endl;
-					if ( (int)consistent.size() > clusterClone.size()*0.5 ) {
-//						cout << "...\n";
+					if ( (int)consistent.size() > clusterClone.size()*0.8 ) {
 						PoseDepth( consistent, pose );
 						VisualizeReproMatch( consistent, pose );					
 						return true;
@@ -601,12 +612,7 @@ namespace MopedNS {
 					clusterClone.erase(clusterClone.begin());
 					clusterClone.erase(clusterClone.begin());					
 				}
-//				getchar();				
 			}
-							
-			
-			
-			// pose estimation and check
 		}
 		
 		

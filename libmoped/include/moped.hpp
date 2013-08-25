@@ -365,8 +365,10 @@ namespace MopedNS {
 				p0 = halfHull.begin(); p2 = p0++; p1 = p0++;
 
 				Float det = (((*p0)[0]-(*p1)[0])*((*p2)[1]-(*p1)[1])) - (((*p2)[0]-(*p1)[0])*((*p0)[1]-(*p1)[1]));
-				if( det <= 0 ) halfHull.erase(p1);
-				else convex = true;
+				if( det <= 0 ) 
+					halfHull.erase(p1);
+				else 
+					convex = true;
 			}
 
 			if( p == (int)points.size() -1 ) {
