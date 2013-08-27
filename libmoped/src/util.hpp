@@ -42,6 +42,7 @@ namespace MopedNS {
 		};
 		struct Match {
 			int imageIdx;
+			double dist;
 			Pt<2> coord2D;
 			Pt<3> coord3D;
 			Pt<3> cloud3D;

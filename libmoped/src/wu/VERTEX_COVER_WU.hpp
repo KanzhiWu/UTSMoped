@@ -9,6 +9,7 @@ namespace MopedNS {
 			Pt<3> obsPos;
 			vector<Pt<3> > mdlPos;
 			vector<Pt<2> > imgPos;
+			vector<int> obsIdxs;
 			int obsIdx;
 			vector<int> mdlIdxs;
 			
@@ -76,6 +77,7 @@ namespace MopedNS {
 							node.mdlPos.push_back(mdlPt);
 							node.imgPos.push_back(imgPt);
 							node.obsIdx = idx;
+							node.obsIdxs.push_back( idx );
 							node.mdlIdxs.push_back( mdlIdx );
 							nodes.push_back( node );
 							count ++;
@@ -84,11 +86,52 @@ namespace MopedNS {
 							int tmp = usedObsPts[obsPt];
 							nodes[tmp].mdlPos.push_back(mdlPt);
 							nodes[tmp].imgPos.push_back(imgPt);
-							nodes[tmp].mdlIdxs.push_back( mdlIdx );							
+							nodes[tmp].mdlIdxs.push_back( mdlIdx );	
+							nodes[tmp].obsIdxs.push_back( idx );						
 						}
 					}
 					
 					map<int, int> usedMdlPts;
+					
+					// Weighted vertex cover
+					/*
+					for ( int node = 0; node < nodes.size(); node ++ ) {
+						int matchNum = nodes[node].obsIdxs.size();
+						if ( matchNum != 1 ) {
+							// multiple matches for 1 observed feature
+							double minDist = INT_MAX;
+							int minIdx;
+							for ( int i = 0; i < nodes[node].obsIdxs.size(); i ++ ) {
+								int matchIdx = nodes[node].obsIdxs[i];
+								double matchDist = matches[model][matchIdx].dist;
+								if ( dist < minDist ) {
+									minDist = dist;
+									minIdx = i;
+								}
+							}
+							for ( int i = 0; i < nodes[node].obsIdxs.size(); i ++ ) {
+								if ( i != minIdx ) {
+									nodes[node].obsIdxs.erase( nodes[node].obsIdxs.begin() + i );
+									nodes[node].mdlIdxs.erase( nodes[node].mdlIdxs.begin() + i );
+								}
+							}						
+						}
+						int mdlSize = nodes[node].mdlIdxs.size();
+						if ( mdlSize == 1 ) {
+							int mdlIdx = nodes[node].mdlIdxs[0];
+							if ( usedMdlPts[mdlIdx] == 0 ) {
+								usedMdlPts[mdlIdx] = node;
+							}
+							else {
+								// compare the matched distances
+								int preNode = usedMdlPts[mdlIdx];
+								int preMatch = nodes[preNode].obsIdx;
+								int curMatch = nodes[node].obsIdx;
+							}
+						}							
+					}
+					*/
+					// Unweighted vertex cover
 					for ( int it = 0; it < nodes.size(); it ++ ) {
 						for ( int i = 0; i < nodes[it].mdlIdxs.size(); i ++ ) {
 							int mdlIdx = nodes[it].mdlIdxs[i];

@@ -152,6 +152,7 @@ namespace MopedNS {
 						match.imageIdx = corresp[i].imageIdx;
 						match.coord3D = *correspFeat[nx[0]];
 						match.coord2D = corresp[i].coord2D;
+						match.dist = ds[0];
 
 						Pt<3> tmp;
 						tmp[2] = corresp[i].cloud3D[2];

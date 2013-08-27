@@ -38,7 +38,8 @@
 #include <wu/CLUSTER_MEAN_SHIFT_CPU_WU.hpp>
 #include <wu/LONGUET_HIGGINS_WU.hpp>
 #include <wu/VERTEX_COVER_WU.hpp>
-
+#include <wu/VERTEX_COVER_GEO_WU.hpp>
+#include <wu/NO_RANSAC_POSE_DEPTH_CPU_WU.hpp>
 #define DEFAULT_DISPLAY_LEVEL 1
 
 
@@ -48,20 +49,22 @@ namespace MopedNS {
 	void createPipeline( MopedPipeline &pipeline ) {
 		// UTS pipeline
 
-//		pipeline.addAlg( "MODEL_PROCESS", new MODEL_PROCESS );
 		pipeline.addAlg( "UNDISTORTED_IMAGE", new UTIL_UNDISTORT );		
 		pipeline.addAlg( "PLANE_REMOVAL", new PLANE_EXTRACTION(0., 0., 0., 0., 0.) );
 		pipeline.addAlg( "SIFT", new FEAT_SIFT_CPU_WU("-1") );
 		pipeline.addAlg( "MATCH_SIFT", new MATCH_ANN_CPU_WU( 128, "SIFT", 5., 0.8) );
-//		pipeline.addAlg( "MATCH_DISPLAY", new MATCH_DISPLAY(3) );
-		pipeline.addAlg( "CLUSTER", new CLUSTER_MEAN_SHIFT_CPU_WU(10, 3, 20, 100) ); //10, 3, 20, 100
+		pipeline.addAlg( "VERTEX_COVER_GEO", new VERTEX_COVER_GEO_WU(0.0, 0.0) );
 		pipeline.addAlg( "CLUSTER_DISPLAY", new CLUSTER_DISPLAY(3) );
-		pipeline.addAlg( "VERTEX_COVER", new VERTEX_COVER_WU(0.0, 0.0) );
+		pipeline.addAlg( "POSE", new NO_RANSAC_POSE_DEPTH_CPU_WU(0.0, 0.0, 500) );
+//		pipeline.addAlg( "MATCH_DISPLAY", new MATCH_DISPLAY(3) );
+//		pipeline.addAlg( "CLUSTER", new CLUSTER_MEAN_SHIFT_CPU_WU(10, 3, 20, 100) ); //10, 3, 20, 100
+//		pipeline.addAlg( "VERTEX_COVER", new VERTEX_COVER_WU(0.0, 0.0) );
 //		pipeline.addAlg( "LONGUET_HIGGINS", new LONGUET_HIGGINS_WU(8) );
-		pipeline.addAlg( "POSE", new POSE_DEPTH_CPU_WU( 500, 1, 4, 30, 3.0 ) );
+//		pipeline.addAlg( "POSE", new POSE_DEPTH_CPU_WU( 500, 1, 4, 30, 3.0 ) );
 		pipeline.addAlg( "POSE_DISPLAY", new POSE_DISPLAY(3) );
 //		pipeline.addAlg( "STATUS_DISPLAY", new STATUS_DISPLAY( DEFAULT_DISPLAY_LEVEL ) );
 //		pipeline.addAlg( "GLOBAL_DISPLAY", new GLOBAL_DISPLAY( 2 ) );
+
 /*					
 		pipeline.addAlg( "UNDISTORTED_IMAGE", new UTIL_UNDISTORT );		
 		pipeline.addAlg( "SIFT", new FEAT_SIFT_CPU("-1") );
