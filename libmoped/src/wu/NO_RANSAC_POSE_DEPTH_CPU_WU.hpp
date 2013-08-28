@@ -117,7 +117,8 @@ namespace MopedNS {
 			return sum;
 		}		
 		
-		bool MedianSVD( Pose &pose, vector<Match3DData *> samples ) {
+		bool PoseSVD( Pose &pose, vector<Match3DData *> samples ) {
+			//VisualizeMatch( samples );
 			int ptNum = samples.size();
 			Eigen::MatrixXd matModel(ptNum, 3), matObser(ptNum, 3);	
 			Match2Matrix( samples, matModel, matObser );
@@ -225,6 +226,43 @@ namespace MopedNS {
 			return true;			
 		}
 
+		void initPose( Pose &pose ) {
+			pose.rotation.init( (rand()&255)/256., (rand()&255)/256., (rand()&255)/256., (rand()&255)/256. );
+			pose.translation.init( 0.,0.,0.5 );
+		}		
+
+		void testAllPoints( vector<Match3DData *> &consistentCorresp, const Pose &pose, const vector<Match3DData *> &testPoints, const Float ErrorThreshold ) {
+			consistentCorresp.clear();
+			foreach( corresp, testPoints ) {
+				Pt<2> p = project( pose, corresp->model3d, *corresp->image );
+				p -= corresp->image2d;
+				Float projectionError = p[0]*p[0]+p[1]*p[1];
+				if( projectionError < ErrorThreshold )
+					consistentCorresp.push_back(corresp);
+			}
+		}
+	
+		bool PoseEstimation( Pose &pose, const vector<Match3DData *> &samples ) {
+			initPose( pose );
+			bool PoseFlag = PoseSVD( pose, samples);
+			if ( PoseFlag == false )
+				return false;
+			else
+				return true;
+				int LMIterations = optimizeCamera( pose, samples, MaxLMTests );
+				if( LMIterations == -1 ) continue;
+
+				vector<LmData *> consistent;
+				testAllPoints( consistent, pose, cluster, 5.0 );
+
+				if ( (int)consistent.size() > MinNPtsObject ) {
+					optimizeCamera( pose, consistent, MaxLMTests );
+					return true;
+				}
+			}
+			return false;
+		}		
+
 		static void lmFuncQuat(Float *lmPose, Float *pts2D, int nPose, int nPts2D, void *data) {
 			vector<Match3DData *> &lmData = *(vector<Match3DData *> *)data;
 			Pose pose;
@@ -271,11 +309,26 @@ namespace MopedNS {
 			pose.rotation.norm();
 			return true;
 		}
-		
-		void initPose( Pose &pose ) {
-			pose.rotation.init( (rand()&255)/256., (rand()&255)/256., (rand()&255)/256., (rand()&255)/256. );
-			pose.translation.init( 0.,0.,0.5 );
-		}		
+
+		void VisualizeMatch( vector<Match3DData *> data ) {
+			Image *img = data[0]->image;
+			cv::Mat cvImage( img->height, img->width, CV_8UC1 );
+			for (int y = 0; y < img->height; y++) 
+				for (int x = 0; x < img->width; x++) 
+					cvImage.at<uchar>(y, x) = (float)img->data[img->width*y+x];				
+			
+			int dataNum = data.size();
+
+			for ( int i = 0; i < dataNum; i ++ ) {
+				cv::Point pt;
+				pt.x = data[i]->image2d[0];
+				pt.y = data[i]->image2d[1];
+				cv::circle( cvImage, pt, 5, cv::Scalar::all(0), 2 );
+			}
+			
+			cv::imshow( "image", cvImage );
+			cv::waitKey(10);			
+		}
 		
 		
 	public:
@@ -314,13 +367,13 @@ namespace MopedNS {
 			for(int task = 0; task < (int)tasks.size(); task ++) {
 				int model = tasks[task].first;
 				int cluster = tasks[task].second;
+				cout << "model: " << model << ", cluster: " << cluster << endl;
 				vector<Match3DData *> cl;
 				foreach( point, clusters[model][cluster] ) 
 					cl.push_back( & matchData[model][point] );
 //				OutputMatch(cl);
 //				outputcl(cl);
 				Pose pose;
-				initPose( pose );
 				bool found = MedianSVD( pose, cl );
 				if ( found == true ) {
 //					bool opt = OptimizeCamera( pose, cl, maxLMTests );

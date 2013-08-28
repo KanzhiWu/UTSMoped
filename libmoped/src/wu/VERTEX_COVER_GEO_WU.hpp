@@ -70,7 +70,6 @@ namespace MopedNS {
 				}
 			}	
 			
-			cout << matches.size() << "*";
 			#pragma omp parallel for
 			for ( int model = 0; model < (int)matches.size(); model ++ ) {
 				
@@ -188,8 +187,8 @@ namespace MopedNS {
 				usedObsPts.clear();
 				usedNodes.clear();
 			}
-			cv::imshow( "Cluster", cvImage );
-			cv::waitKey(10);			
+//			cv::imshow( "Cluster", cvImage );
+//			cv::waitKey(10);			
 					
 		}		
 	};

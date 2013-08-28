@@ -65,8 +65,8 @@ namespace MopedNS {
 //		pipeline.addAlg( "STATUS_DISPLAY", new STATUS_DISPLAY( DEFAULT_DISPLAY_LEVEL ) );
 //		pipeline.addAlg( "GLOBAL_DISPLAY", new GLOBAL_DISPLAY( 2 ) );
 
-/*					
-		pipeline.addAlg( "UNDISTORTED_IMAGE", new UTIL_UNDISTORT );		
+					
+/*		pipeline.addAlg( "UNDISTORTED_IMAGE", new UTIL_UNDISTORT );		
 		pipeline.addAlg( "SIFT", new FEAT_SIFT_CPU("-1") );
 		pipeline.addAlg( "MATCH_SIFT", new MATCH_ANN_CPU( 128, "SIFT", 5., 0.8) );
 		pipeline.addAlg( "CLUSTER", new CLUSTER_MEAN_SHIFT_CPU( 200, 20, 7, 100) );
